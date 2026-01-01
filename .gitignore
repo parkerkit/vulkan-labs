@@ -1,8 +1,14 @@
-/.vs
-/.vscode
-/build
-/out
-/target
-/install
-/libs
-/includes
+build/
+CMakeUserPresets.json
+
+.vscode/
+
+.vs/
+out/
+
+.claude/
+
+# Local tooling caches
+.pre-commit-cache/
+__pycache__/
+*.pyc
