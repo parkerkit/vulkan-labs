@@ -13,6 +13,7 @@
 | [GLFW](https://github.com/glfw/glfw) | 3.4.0 | `ThirdParty::glfw` | 静态库，窗口与输入 |
 | [GLM](https://github.com/g-truc/glm) | 1.0.3 | `ThirdParty::glm` | 头文件，数学运算 |
 | [Dear ImGui](https://github.com/ocornut/imgui) | 1.89.8 WIP | `ThirdParty::imgui` | 静态库，core / demo 与 GLFW、Vulkan backend |
+| [meshoptimizer](https://github.com/zeux/meshoptimizer) | 1.2 | `ThirdParty::meshoptimizer` | 静态库，meshlet 构建与网格优化 |
 | [stb](https://github.com/nothings/stb) | stb_image 2.30；stb_image_write 1.16 | `ThirdParty::stb_image`、`ThirdParty::stb_image_write` | 两个静态库，图像读写 |
 | [tinyobjloader](https://github.com/tinyobjloader/tinyobjloader) | `v2.0.0rc13` | `ThirdParty::tiny_obj` | 头文件接口，OBJ 解析 |
 | [TinyGLTF](https://github.com/syoyo/tinygltf) | `v2.9.0` | `ThirdParty::tiny_gltf` | 头文件接口，glTF 解析 |
@@ -38,6 +39,7 @@ target_link_libraries(my_target PRIVATE
 | `<GLFW/glfw3.h>` | `ThirdParty::glfw` |
 | `<glm/glm.hpp>` | `ThirdParty::glm` |
 | `<imgui.h>` | `ThirdParty::imgui` |
+| `<meshoptimizer.h>` | `ThirdParty::meshoptimizer` |
 | `<stb_image.h>` | `ThirdParty::stb_image` |
 | `<stb_image_write.h>` | `ThirdParty::stb_image_write` |
 | `<tiny_obj/tiny_obj_loader.h>` | `ThirdParty::tiny_obj` |
@@ -54,7 +56,16 @@ tinyobjloader 和 TinyGLTF 的 implementation 宏由使用它们的程序在一�
 
 ## 构建边界
 
-GLFW 使用本目录中的平台源码与 `glfw/CMakeLists.txt` 构建；GLM 直接通过接口 target 提供头文件。ImGui 只接入 GLFW 与 Vulkan backend，链接依赖由 target 传播。
+`third_party/CMakeLists.txt` 统一加载 `cmake/` 中各依赖的适配模块。调用方通过 `ThirdParty::` 别名链接，头文件路径和链接要求由 target 传播。
+
+| 模块 | 构建职责 |
+| --- | --- |
+| [glfw.cmake](cmake/glfw.cmake) | 调用 `glfw/CMakeLists.txt`，编译平台窗口与输入实现 |
+| [glm.cmake](cmake/glm.cmake) | 通过接口 target 提供 GLM 头文件 |
+| [imgui.cmake](cmake/imgui.cmake) | 编译 ImGui core / demo 与 GLFW、Vulkan backend，声明 GLFW 和 Vulkan 链接依赖 |
+| [meshoptimizer.cmake](cmake/meshoptimizer.cmake) | 显式列出 `meshoptimizer/src/` 源码并编译为静态库 |
+| [stb.cmake](cmake/stb.cmake) | 分别编译图像读取与写入的共享实现 |
+| [tiny_obj.cmake](cmake/tiny_obj.cmake)、[tiny_gltf.cmake](cmake/tiny_gltf.cmake)、[nlohmann_json.cmake](cmake/nlohmann_json.cmake) | 提供头文件接口及其传递依赖 |
 
 `third_party_setup_target()` 为第三方编译 target 关闭 clang-tidy、编译告警和告警视为错误。第三方 include 路径使用 `SYSTEM`；提交 hook 也排除整个本目录。
 
@@ -69,6 +80,7 @@ TinyGLTF 使用 nlohmann/json 与 stb；当前配置没有启用 RapidJSON、Dra
 | GLFW | [LICENSE.md](glfw/LICENSE.md) |
 | GLM | [copying.txt](glm/copying.txt) |
 | Dear ImGui | [LICENSE.txt](imgui/LICENSE.txt) |
+| meshoptimizer | [LICENSE.md](meshoptimizer/LICENSE.md) |
 | stb | [LICENSE](stb/LICENSE) |
 | tinyobjloader | [LICENSE](tiny_obj/LICENSE) |
 | TinyGLTF | [LICENSE](tiny_gltf/LICENSE) |

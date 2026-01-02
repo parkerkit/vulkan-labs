@@ -39,7 +39,7 @@ flowchart TD
 
 根构建统一启用 C++20、关闭语言扩展，并提供 `BUILD_SAMPLES` 和 `ENABLE_CLANG_TIDY` 选项。Vulkan 通过 `find_package(Vulkan REQUIRED)` 获取，其他依赖由本地 target 提供。
 
-samples 的公共构建逻辑为每个程序链接 Vulkan、GLFW、GLM、ImGui、stb、tinyobjloader 和 TinyGLTF；各程序按需要使用这些能力。依赖的 include、链接要求和共享实现见[第三方依赖](../third_party/README.md)。
+samples 的公共构建逻辑为每个程序链接 Vulkan、GLFW、GLM、ImGui、meshoptimizer、stb、tinyobjloader 和 TinyGLTF；各程序按需要使用这些能力。依赖的 include、链接要求和共享实现见[第三方依赖](../third_party/README.md)。
 
 ## 公共 CMake 模块
 
@@ -75,15 +75,26 @@ samples/02_advance/04_pushconstants/main2.cpp
 
 ## Shader 构建
 
-示例 `shaders/` 下的 `.vert`、`.frag`、`.comp` 和 `.geom` 使用 `glslc` 编译。输出名称由分组编号、示例编号与原始文件名组成，文件名中的点转换为下划线：
+`samples/CMakeLists.txt` 收集示例 `shaders/` 目录中的 GLSL 文件，通过 `project_compile_shader(source output)` 定义编译规则：
+
+| 文件类型 | 编译设置 |
+| --- | --- |
+| `.vert`、`.frag`、`.comp`、`.geom` | 使用 `glslc` 默认目标环境 |
+| `.mesh`、`.task` | 使用 `--target-env=vulkan1.2`，满足 Mesh / Task Shader 对 SPIR-V 1.4 或更高版本的要求 |
+
+SPIR-V 输出名称由分组编号、示例编号与原始文件名组成，文件名中的点转换为下划线：
 
 ```text
 samples/02_advance/08_deferred_shading/shaders/base.frag
         ↓
 bin/shaders/02_08_base_frag.spv
+
+samples/06_extensions/04_mesh_shader/shaders/base.mesh
+        ↓
+bin/shaders/06_04_base_mesh.spv
 ```
 
-`project_compile_shader()` 创建输出目录，调用 `glslc -MD -MF`，通过 depfile 跟踪 GLSL include。示例的 `<原 target 名>_shaders` target 汇总输出，同目录各可执行 target 共用这个构建步骤，避免重复定义 Shader 编译命令。
+编译函数创建输出目录，调用 `glslc -MD -MF`，通过 depfile 跟踪 GLSL include。示例的 `<原 target 名>_shaders` target 汇总输出，同目录各可执行 target 共用这个构建步骤。
 
 构建逻辑还读取同目录各入口及公共源码中 `PROJECT_SHADER_DIR "文件名.spv"` 形式的引用，加入相应产物依赖，以支持跨示例复用。各版本引用的 Shader 统一汇入该示例共享的 Shader target。
 

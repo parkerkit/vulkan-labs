@@ -2,7 +2,7 @@
 
 [文档](README.md) · [效果展示](gallery.md) · [构建与运行](getting-started.md)
 
-`samples/` 包含 8 个主题分组、70 个独立可执行程序。表中名称就是构建使用的 target，点击名称进入对应源码。
+`samples/` 包含 8 个主题分组、71 个独立可执行程序。表中名称就是构建使用的 target，点击名称进入对应源码。
 
 ```powershell
 cmake --build --preset msvc-debug-tidy --target <target>
@@ -113,6 +113,7 @@ cmake --build --preset msvc-debug-tidy --target <target>
 | [`06_02_multi_view`](../samples/06_extensions/02_multi_view/main.cpp) | 视图掩码、`gl_ViewIndex` 与数组图像各层 |
 | [`06_03_dynamic_rendering`](../samples/06_extensions/03_dynamic_rendering/main.cpp) | 使用 KHR 扩展命令进行动态渲染 |
 | [`06_03_dynamic_rendering2`](../samples/06_extensions/03_dynamic_rendering/main2.cpp) | 使用 Vulkan 1.3 核心命令 vkCmdBeginRendering |
+| [`06_04_mesh_shader`](../samples/06_extensions/04_mesh_shader/main.cpp) | CPU 划分 meshlet，Mesh Shader 绘制苹果模型并按 meshlet 着色；[画面与操作](gallery.md#mesh-shader) |
 
 接口与 feature 的关系见[设备特性与扩展](rendering-techniques.md#设备特性与扩展)。
 

@@ -47,6 +47,8 @@ function(samples_add_group group)
                 "${sample_directory}/shaders/*.frag"
                 "${sample_directory}/shaders/*.comp"
                 "${sample_directory}/shaders/*.geom"
+                "${sample_directory}/shaders/*.mesh"
+                "${sample_directory}/shaders/*.task"
             )
             foreach(shader IN LISTS sample_shaders)
                 get_filename_component(shader_name "${shader}" NAME)
@@ -87,6 +89,7 @@ function(samples_add_group group)
                 ThirdParty::glfw
                 ThirdParty::glm
                 ThirdParty::imgui
+                ThirdParty::meshoptimizer
                 ThirdParty::stb_image
                 ThirdParty::stb_image_write
                 ThirdParty::tiny_obj

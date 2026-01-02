@@ -167,10 +167,44 @@ CPU 并行录制与 GPU 执行并行由不同机制决定。Command Pool、Queue
 | [Conditional Rendering](../samples/06_extensions/01_conditional_render/main.cpp) | 界面更新条件 Buffer，控制图元绘制 | `VK_EXT_conditional_rendering` 及相应 feature |
 | [Multiview](../samples/06_extensions/02_multi_view/main.cpp) | 视图掩码与 `gl_ViewIndex` 输出到数组图像各层，再采样显示 | Multiview feature 和相应接口 |
 | [Dynamic Rendering](../samples/06_extensions/03_dynamic_rendering/main.cpp) | 开始渲染时直接指定附件 | `dynamicRendering` |
+| [Mesh Shader](../samples/06_extensions/04_mesh_shader/main.cpp) | 每个工作组读取一个 meshlet，直接输出顶点与三角形 | `VK_EXT_mesh_shader`、`meshShader`；[运行要求](getting-started.md#运行-mesh-shader-示例) |
 
 动态渲染的 [KHR 扩展版本](../samples/06_extensions/03_dynamic_rendering/main.cpp)对应 `06_03_dynamic_rendering`，[Vulkan 1.3 核心版本](../samples/06_extensions/03_dynamic_rendering/main2.cpp)对应 `06_03_dynamic_rendering2`。该路径通过管线 Rendering Create Info 声明附件格式，不创建传统 Render Pass / Framebuffer。
 
 Viewport Arrays 选择视口，Multiview 选择视图及附件层。两者的分屏外观可以相近，但资源与执行机制不同。
+
+## Mesh Shader 与 meshlet
+
+### 模型数据
+
+[`06_04_mesh_shader`](../samples/06_extensions/04_mesh_shader/main.cpp) 通过 tinyobjloader 读取 `apple.obj` 的位置与三角形索引，在 CPU 上居中、缩放模型，再用 meshoptimizer 的 `meshopt_buildMeshlets()` 划分 meshlet，并调用 `meshopt_optimizeMeshlet()` 优化每个 meshlet 的局部索引。
+
+```text
+apple.obj → CPU 划分与优化 meshlet → 四份只读 SSBO → Mesh Shader → Fragment Shader
+```
+
+模型数据保存在四份只读 SSBO 中，所有帧共享：
+
+| 数据 | CPU / Shader 布局 | 用途 |
+| --- | --- | --- |
+| 顶点位置 | `glm::vec4` / `vec4` 数组 | 保存模型空间位置 |
+| Meshlet 元数据 | 四个 `uint32_t` / 四个 `uint` | 保存顶点与三角形索引的偏移、数量 |
+| Meshlet 顶点索引 | `uint32_t` / `uint` 数组 | 从 meshlet 局部顶点定位模型顶点 |
+| 局部三角形索引 | `uint32_t` / `uint` 数组 | 每三个元素描述一个三角形 |
+
+CPU 数据与 Shader 的 `std430` 布局对应。meshoptimizer 生成的字节三角形索引在上传前扩展为 `uint32_t`，Shader 通过 `uint` 读取。
+
+### 绘制与帧同步
+
+[base.mesh](../samples/06_extensions/04_mesh_shader/shaders/base.mesh) 使用 32 个 invocation 的工作组，每个工作组处理一个 meshlet，最多输出 64 个顶点和 128 个三角形。`SetMeshOutputsEXT()` 声明实际输出数量，随后各 invocation 分担顶点变换与三角形索引输出。顶点颜色由 meshlet 编号生成，[base.frag](../samples/06_extensions/04_mesh_shader/shaders/base.frag) 将该颜色写入画面，便于观察分块。
+
+模型管线由 Mesh 与 Fragment 阶段组成。CPU 通过 `vkCmdDrawMeshTasksEXT()` 分派工作组，使用 Push Constant 传入起始 meshlet，并按设备的单次分派上限分批完成绘制。
+
+两个帧槽位分别持有指令缓冲、UBO、图像获取信号量和提交栅栏。CPU 等待当前槽位的栅栏后更新 UBO、重置并录制该槽位的指令缓冲；获取的交换链图像索引用于选择 framebuffer 和呈现完成信号量。
+
+所有 framebuffer 共用深度附件。Render Pass 的外部依赖覆盖 early / late fragment tests，通过深度写到深度读写的内存依赖约束跨帧访问及自动布局转换。交换链重建时等待设备空闲，重新创建图像视图、深度附件、framebuffer 和与图像数量匹配的呈现完成信号量；帧槽位资源独立于交换链图像数量。
+
+构建环境、资源与设备要求见[运行指南](getting-started.md#运行-mesh-shader-示例)，分块效果见[运行画面](gallery.md#mesh-shader)。
 
 ## 阴影与 HDR
 

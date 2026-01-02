@@ -62,6 +62,23 @@
 
 [主程序](../samples/01_vulkan_tutorial/09_compute_shader/main.cpp) · [计算 Shader](../samples/01_vulkan_tutorial/09_compute_shader/shaders/base.comp) · [粒子着色](../samples/01_vulkan_tutorial/09_compute_shader/shaders/base.frag) · [实现解析](rendering-techniques.md#计算与间接绘制)
 
+## Mesh Shader
+
+`06_04_mesh_shader` 使用 Mesh Shader 绘制苹果模型，表面的彩色分块对应不同 meshlet。
+
+![苹果模型通过 Mesh Shader 绘制，不同 meshlet 显示为不同颜色](screenshots/06_04_mesh_shader.png)
+
+截图中的模型包含 30,884 个顶点、61,740 个三角形，划分为 654 个 meshlet。左上角界面显示模型数量统计与每个 meshlet 的顶点、三角形上限。
+
+| 操作 | 作用 |
+| --- | --- |
+| 左键拖动 / 右键拖动 / 滚轮 | 平移 / 旋转视角 / 缩放 |
+| `R` | 恢复默认视角 |
+
+设备要求、模型资源与启动命令见[运行 Mesh Shader 示例](getting-started.md#运行-mesh-shader-示例)。
+
+[主程序](../samples/06_extensions/04_mesh_shader/main.cpp) · [Mesh Shader](../samples/06_extensions/04_mesh_shader/shaders/base.mesh) · [片段着色](../samples/06_extensions/04_mesh_shader/shaders/base.frag) · [实现解析](rendering-techniques.md#mesh-shader-与-meshlet)
+
 ## 阴影映射
 
 `08_01_shadow_mapping` 从光源视角生成 4096×4096 深度贴图，再从相机视角进行深度比较。场景由球体和平面组成，`Enable PCF` 切换单点比较与 3×3 邻域过滤。

@@ -8,11 +8,18 @@ function(project_compile_shader source output)
         )
     endif()
 
+    set(shader_compile_options)
+    get_filename_component(shader_extension "${source}" LAST_EXT)
+    if(shader_extension MATCHES "^\\.(mesh|task)$")
+        # Mesh and task shaders require SPIR-V 1.4 or later.
+        list(APPEND shader_compile_options --target-env=vulkan1.2)
+    endif()
+
     get_filename_component(output_directory "${output}" DIRECTORY)
     add_custom_command(
         OUTPUT "${output}"
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${output_directory}"
-        COMMAND "${GLSLC_EXE}" -MD -MF "${output}.d" "${source}" -o "${output}"
+        COMMAND "${GLSLC_EXE}" ${shader_compile_options} -MD -MF "${output}.d" "${source}" -o "${output}"
         DEPENDS "${source}"
         DEPFILE "${output}.d"
         COMMENT "Compiling shader ${source}"

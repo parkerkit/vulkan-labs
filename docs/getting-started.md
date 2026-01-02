@@ -29,7 +29,15 @@ git submodule update --init --recursive
 
 `assets/` 是 [graphics-assets](https://github.com/parkerkit/graphics-assets) 子模块；第三方 C/C++ 库随主仓库保存，构建期间不下载依赖。
 
-模型、纹理等按源码中的 `PROJECT_ASSETS_DIR` 路径加载。例如，模型及后处理示例使用 `models/viking_room/`，Cubemap 使用 `textures/skybox/`。资源子模块应与主仓库记录的提交匹配，许可见[资源说明](../assets/README.md)。
+模型、纹理等按源码中的 `PROJECT_ASSETS_DIR` 路径加载。以下路径均相对于 `assets/`：
+
+| 示例 | 资源路径 |
+| --- | --- |
+| OBJ 模型加载与后处理 | `models/viking_room/` |
+| Mesh Shader | `models/apple.obj` |
+| Cubemap | `textures/skybox/` |
+
+资源子模块应与主仓库记录的提交匹配，运行前需准备对应示例使用的文件。资源许可见[资源说明](../assets/README.md)。
 
 ## 构建第一个程序
 
@@ -47,6 +55,28 @@ cmake --build --preset msvc-debug-tidy --target 02_08_deferred_shading
 ```
 
 全部名称见[示例目录](samples.md)。省略 `--target` 会构建全部启用的目标。
+
+## 运行 Mesh Shader 示例
+
+`06_04_mesh_shader` 的运行与编译要求如下：
+
+| 项目 | 要求 |
+| --- | --- |
+| Vulkan API | 1.2 或更高版本 |
+| 设备扩展 | `VK_EXT_mesh_shader` |
+| 设备特性 | `meshShader`；不要求 `taskShader` |
+| 设备上限 | 支持 32 个 invocation 的工作组、64 个输出顶点、128 个输出三角形及所需的描述符与输出内存 |
+| Shader 编译器 | SDK 中的 `glslc` 支持 `GL_EXT_mesh_shader` |
+
+设备筛选条件见[主程序](../samples/06_extensions/04_mesh_shader/main.cpp)中的 `IsDeviceSuitable()` 和 `SupportsMeshShaderLimits()`。准备上述资源后，在已初始化 MSVC x64 环境的终端中执行：
+
+```powershell
+cmake --preset msvc-debug-tidy
+cmake --build --preset msvc-debug-tidy --target 06_04_mesh_shader
+.\build\msvc-debug-tidy\bin\06_04_mesh_shader.exe
+```
+
+模型分块效果与相机操作见[效果展示](gallery.md#mesh-shader)，数据流见[Mesh Shader 与 meshlet](rendering-techniques.md#mesh-shader-与-meshlet)，着色器产物规则见[Shader 构建](project-layout.md#shader-构建)。
 
 ## 选择配置
 

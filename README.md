@@ -21,14 +21,19 @@
 | [![阴影映射与 PCF](docs/screenshots/08_01_shadow_mapping_pcf.png)](docs/gallery.md#阴影映射) | [![离屏场景的边缘检测](docs/screenshots/02_10_post_process_edge_detection.png)](docs/gallery.md#后处理) |
 | 光源深度贴图、深度比较与 3×3 PCF | 离屏颜色采样、卷积滤镜与 FXAA |
 
-更多附件视图、滤镜对比、Cubemap 与 HDR 画面见[效果展示](docs/gallery.md)。
+| Mesh Shader | HDR 与色调映射 |
+| --- | --- |
+| [![苹果模型按 meshlet 显示彩色分块](docs/screenshots/06_04_mesh_shader.png)](docs/gallery.md#mesh-shader) | [![HDR 场景使用 Reinhard 色调映射](docs/screenshots/08_02_hdr_reinhard.png)](docs/gallery.md#hdr-与色调映射) |
+| CPU 划分 meshlet，Mesh Shader 直接输出顶点与三角形 | 浮点离屏颜色与显示输出映射 |
+
+更多附件视图、滤镜对比与 Cubemap 画面见[效果展示](docs/gallery.md)。
 
 ## 实现内容
 
 - **资源与绑定**：顶点与索引、Uniform、动态偏移、Push Constants、纹理、Mipmap、OBJ / glTF。
 - **渲染与图像**：PBR 材质预览、深度与模板、MSAA、离屏渲染、Input Attachments、延迟渲染、阴影与色调映射。
 - **计算与命令**：粒子模拟、Storage Image、间接绘制参数、命令复用、多线程录制、查询与管线缓存。
-- **API 与对象管理**：Geometry Shader、多视口、Multiview、Conditional Rendering、Dynamic Rendering、无窗口执行与 Vulkan-Hpp RAII。
+- **API 与对象管理**：Geometry Shader、Mesh Shader、多视口、Multiview、Conditional Rendering、Dynamic Rendering、无窗口执行与 Vulkan-Hpp RAII。
 
 示例保留各自的初始化、资源创建和命令提交流程，技术实现可以从 `main.cpp`、`mainN.cpp` 与对应 GLSL 连贯阅读。[示例目录](docs/samples.md)列出各版本的独立可执行 target、源码入口和用途。
 
