@@ -58,6 +58,41 @@
 
 [Cubemap](../samples/02_advance/23_texture_cube_map/main.cpp)将六张图像上传到立方体兼容 Image 的六个数组层，创建 Cube View。[顶点 Shader](../samples/02_advance/23_texture_cube_map/shaders/cube.vert)传出立方体位置作为采样方向，[片段 Shader](../samples/02_advance/23_texture_cube_map/shaders/cube.frag)用 `samplerCube` 取色。六面的顺序和方向决定面与面之间的对应关系，画面见[预览](gallery.md#cubemap)。
 
+## VMA 内存分配
+
+内存分配分组使用 Vulkan Memory Allocator（VMA）3.3.0，通过 `ThirdParty::vma` 链接统一编译的静态库实现。两个示例包含 `<vk_mem_alloc.h>`，分别管理自身的 allocator 与资源。`CreateAllocator()` 在逻辑设备创建后初始化 `VmaAllocator`，传入 instance、physical device、device，并将运行时 Vulkan API 版本设置为 1.0。
+
+### 资源与分配策略
+
+`BufferDesc` 描述大小、用途、内存偏好和分配标志；`AllocatedBuffer` 同时保存 `VkBuffer` 与 `VmaAllocation`。[模型示例](../samples/09_memory_allocation/02_vma_loading_models/main.cpp)使用 `ImageDesc` / `AllocatedImage` 表达图像参数和分配结果。`vmaCreateBuffer()`、`vmaCreateImage()` 完成资源创建、内存分配及绑定。
+
+| 资源 | 分配设置 | 数据路径 |
+| --- | --- | --- |
+| Staging Buffer | `AUTO_PREFER_HOST` 与 `HOST_ACCESS_SEQUENTIAL_WRITE_BIT` | `vmaCopyMemoryToAllocation()` 完成主机写入及必要的 flush，再提交传输 |
+| 顶点与索引 Buffer | `AUTO_PREFER_DEVICE`，用途包含 `TRANSFER_DST` | 从 staging buffer 复制 |
+| 模型 UBO | `AUTO_PREFER_HOST`、`HOST_ACCESS_SEQUENTIAL_WRITE_BIT` 与 `MAPPED_BIT` | 通过 `VmaAllocationInfo::pMappedData` 持久映射，按帧更新矩阵 |
+| 纹理与深度 Image | `AUTO_PREFER_DEVICE` | 纹理经 staging 上传并转换布局；深度图像作为附件使用 |
+
+[`09_01_vma_vertex_buffers`](../samples/09_memory_allocation/01_vma_vertex_buffers/main.cpp)上传固定的顶点与索引并绘制四边形；`09_02_vma_loading_models` 加载 Viking Room 的 OBJ 与 PNG，另外管理纹理、深度图像和 UBO。资源创建函数返回的结构体保存句柄，由程序显式管理释放。
+
+### 主机写入与缓存可见性
+
+主机访问标志用于申请可映射内存，`AUTO_PREFER_HOST` 表达内存选择偏好，不保证内存具有 `HOST_COHERENT` 属性。映射与持久映射提供 CPU 指针，不能替代缓存刷新或 GPU 执行同步。
+
+两个示例通过 `vmaCopyMemoryToAllocation()` 写入顶点、索引及纹理 staging buffer，由 VMA 处理临时映射、复制和必要的缓存刷新。模型示例的 UBO 保持持久映射，每次 `memcpy` 后调用 `vmaFlushAllocation()`，刷新成功后才提交绘制。两条路径均检查 VMA 返回值，兼容 coherent 与非 coherent 内存。
+
+`vmaFlushAllocation()` 的偏移相对于 allocation，库负责 `nonCoherentAtomSize` 对齐；对 coherent 内存，该调用无需执行底层刷新。映射、解映射与缓存操作的语义见[VMA 官方文档](https://gpuopen-librariesandsdks.github.io/VulkanMemoryAllocator/html/memory_mapping.html)。
+
+### 资源生命周期与同步
+
+上传函数在复制命令提交后调用 `vkQueueWaitIdle()`，随后释放 staging buffer。正常退出时，程序等待设备空闲，通过 `vmaDestroyBuffer()` / `vmaDestroyImage()` 释放资源及其 allocation，最后销毁 allocator 和 device。由 `MAPPED_BIT` 建立的持久映射随 allocation 释放，不需要额外调用 `vmaUnmapMemory()`；显式调用 `vmaMapMemory()` 获得的映射则与 `vmaUnmapMemory()` 成对使用。
+
+两个示例按帧槽位分配指令缓冲、图像获取信号量和提交栅栏，模型示例的 UBO 与描述符也按帧槽位管理。CPU 等待当前槽位的栅栏后，更新数据并重置、录制该槽位的指令缓冲。获取的交换链图像索引用于选择 framebuffer 和呈现完成信号量。
+
+呈现完成信号量随交换链图像分配，在交换链重建时等待设备空闲，销毁并按新图像数量重新创建。模型示例共用的深度附件通过覆盖 early / late fragment tests 的外部依赖同步跨帧读写；清理时先销毁 framebuffer，再释放深度图像视图和 VMA 图像分配。
+
+VMA 负责内存分配与绑定。命令缓冲复用、资源访问依赖、Image 布局转换和交换链重建由应用代码管理。分配设置与接口定义见[随附头文件](../third_party/vma/vk_mem_alloc.h)，构建接入与实现归属见[第三方依赖](../third_party/README.md#单头文件库与实现归属)。
+
 ## 附件与多阶段渲染
 
 ### 管线、深度、模板与混合

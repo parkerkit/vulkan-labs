@@ -2,7 +2,7 @@
 
 [文档](README.md) · [效果展示](gallery.md) · [构建与运行](getting-started.md)
 
-`samples/` 包含 8 个主题分组、71 个独立可执行程序。表中名称就是构建使用的 target，点击名称进入对应源码。
+`samples/` 包含 9 个主题分组、73 个独立可执行程序。表中名称就是构建使用的 target，点击名称进入对应源码。
 
 ```powershell
 cmake --build --preset msvc-debug-tidy --target <target>
@@ -142,6 +142,17 @@ cmake --build --preset msvc-debug-tidy --target <target>
 | [`08_02_hdr`](../samples/08_showcases/02_hdr/main.cpp) | 浮点离屏附件、曝光与 Reinhard；[画面对比](gallery.md#hdr-与色调映射) |
 
 算法与数据流见[阴影与 HDR](rendering-techniques.md#阴影与-hdr)。
+
+## Memory Allocation
+
+通过 Vulkan Memory Allocator（VMA）管理 Buffer / Image 的内存选择、分配与绑定，绘制与队列同步由示例自身组织。
+
+| Target / 源码 | 主题 |
+| --- | --- |
+| [`09_01_vma_vertex_buffers`](../samples/09_memory_allocation/01_vma_vertex_buffers/main.cpp) | VMA 顶点与索引缓冲，staging 上传后绘制彩色四边形 |
+| [`09_02_vma_loading_models`](../samples/09_memory_allocation/02_vma_loading_models/main.cpp) | OBJ 与纹理上传、VMA 纹理及深度图像、持久映射 UBO，绘制旋转模型 |
+
+资源分配、映射和缓存可见性见[VMA 内存分配](rendering-techniques.md#vma-内存分配)。
 
 ## 多个入口与目标
 

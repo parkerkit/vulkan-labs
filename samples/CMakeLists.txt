@@ -94,6 +94,7 @@ function(samples_add_group group)
                 ThirdParty::stb_image_write
                 ThirdParty::tiny_obj
                 ThirdParty::tiny_gltf
+                ThirdParty::vma
             )
             target_compile_definitions("${target_name}" PRIVATE
                 "PROJECT_ASSETS_DIR=\"${PROJECT_ASSETS_DIR}/\""
@@ -118,3 +119,4 @@ samples_add_group("${CMAKE_CURRENT_SOURCE_DIR}/05_geometry_shader")
 samples_add_group("${CMAKE_CURRENT_SOURCE_DIR}/06_extensions")
 samples_add_group("${CMAKE_CURRENT_SOURCE_DIR}/07_vulkan_hpp")
 samples_add_group("${CMAKE_CURRENT_SOURCE_DIR}/08_showcases")
+samples_add_group("${CMAKE_CURRENT_SOURCE_DIR}/09_memory_allocation")

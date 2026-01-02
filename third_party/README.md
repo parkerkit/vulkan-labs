@@ -14,6 +14,7 @@
 | [GLM](https://github.com/g-truc/glm) | 1.0.3 | `ThirdParty::glm` | 头文件，数学运算 |
 | [Dear ImGui](https://github.com/ocornut/imgui) | 1.89.8 WIP | `ThirdParty::imgui` | 静态库，core / demo 与 GLFW、Vulkan backend |
 | [meshoptimizer](https://github.com/zeux/meshoptimizer) | 1.2 | `ThirdParty::meshoptimizer` | 静态库，meshlet 构建与网格优化 |
+| [Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator) | 3.3.0 | `ThirdParty::vma` | 静态库，Buffer / Image 内存分配与绑定 |
 | [stb](https://github.com/nothings/stb) | stb_image 2.30；stb_image_write 1.16 | `ThirdParty::stb_image`、`ThirdParty::stb_image_write` | 两个静态库，图像读写 |
 | [tinyobjloader](https://github.com/tinyobjloader/tinyobjloader) | `v2.0.0rc13` | `ThirdParty::tiny_obj` | 头文件接口，OBJ 解析 |
 | [TinyGLTF](https://github.com/syoyo/tinygltf) | `v2.9.0` | `ThirdParty::tiny_gltf` | 头文件接口，glTF 解析 |
@@ -40,6 +41,7 @@ target_link_libraries(my_target PRIVATE
 | `<glm/glm.hpp>` | `ThirdParty::glm` |
 | `<imgui.h>` | `ThirdParty::imgui` |
 | `<meshoptimizer.h>` | `ThirdParty::meshoptimizer` |
+| `<vk_mem_alloc.h>` | `ThirdParty::vma` |
 | `<stb_image.h>` | `ThirdParty::stb_image` |
 | `<stb_image_write.h>` | `ThirdParty::stb_image_write` |
 | `<tiny_obj/tiny_obj_loader.h>` | `ThirdParty::tiny_obj` |
@@ -54,6 +56,8 @@ TinyGLTF 依赖共享的 stb 和 JSON target。JSON 唯一源码位于 `nlohmann
 
 tinyobjloader 和 TinyGLTF 的 implementation 宏由使用它们的程序在一个翻译单元中定义。每个可执行程序各自管理这些实现，避免在同一程序内重复定义。
 
+VMA 的接口与实现都位于 [vma/vk_mem_alloc.h](vma/vk_mem_alloc.h)。`VMA_IMPLEMENTATION` 只在 [src/vma.cpp](src/vma.cpp) 中定义，通过 `ThirdParty::vma` 静态库供示例链接。使用者包含 `<vk_mem_alloc.h>`，分别创建和管理自身的 allocator。
+
 ## 构建边界
 
 `third_party/CMakeLists.txt` 统一加载 `cmake/` 中各依赖的适配模块。调用方通过 `ThirdParty::` 别名链接，头文件路径和链接要求由 target 传播。
@@ -65,6 +69,7 @@ tinyobjloader 和 TinyGLTF 的 implementation 宏由使用它们的程序在一�
 | [imgui.cmake](cmake/imgui.cmake) | 编译 ImGui core / demo 与 GLFW、Vulkan backend，声明 GLFW 和 Vulkan 链接依赖 |
 | [meshoptimizer.cmake](cmake/meshoptimizer.cmake) | 显式列出 `meshoptimizer/src/` 源码并编译为静态库 |
 | [stb.cmake](cmake/stb.cmake) | 分别编译图像读取与写入的共享实现 |
+| [vma.cmake](cmake/vma.cmake) | 编译 VMA 共享实现，提供 `vma/` 头文件路径和 `Vulkan::Vulkan` 传递依赖 |
 | [tiny_obj.cmake](cmake/tiny_obj.cmake)、[tiny_gltf.cmake](cmake/tiny_gltf.cmake)、[nlohmann_json.cmake](cmake/nlohmann_json.cmake) | 提供头文件接口及其传递依赖 |
 
 `third_party_setup_target()` 为第三方编译 target 关闭 clang-tidy、编译告警和告警视为错误。第三方 include 路径使用 `SYSTEM`；提交 hook 也排除整个本目录。
@@ -81,6 +86,7 @@ TinyGLTF 使用 nlohmann/json 与 stb；当前配置没有启用 RapidJSON、Dra
 | GLM | [copying.txt](glm/copying.txt) |
 | Dear ImGui | [LICENSE.txt](imgui/LICENSE.txt) |
 | meshoptimizer | [LICENSE.md](meshoptimizer/LICENSE.md) |
+| Vulkan Memory Allocator | [LICENSE.txt](vma/LICENSE.txt) |
 | stb | [LICENSE](stb/LICENSE) |
 | tinyobjloader | [LICENSE](tiny_obj/LICENSE) |
 | TinyGLTF | [LICENSE](tiny_gltf/LICENSE) |

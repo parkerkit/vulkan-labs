@@ -39,7 +39,7 @@ flowchart TD
 
 根构建统一启用 C++20、关闭语言扩展，并提供 `BUILD_SAMPLES` 和 `ENABLE_CLANG_TIDY` 选项。Vulkan 通过 `find_package(Vulkan REQUIRED)` 获取，其他依赖由本地 target 提供。
 
-samples 的公共构建逻辑为每个程序链接 Vulkan、GLFW、GLM、ImGui、meshoptimizer、stb、tinyobjloader 和 TinyGLTF；各程序按需要使用这些能力。依赖的 include、链接要求和共享实现见[第三方依赖](../third_party/README.md)。
+samples 的公共构建逻辑为每个程序链接 Vulkan、GLFW、GLM、ImGui、meshoptimizer、stb、tinyobjloader、TinyGLTF 和 VMA；各程序按需要使用这些能力。依赖的 include、链接要求和共享实现见[第三方依赖](../third_party/README.md)。
 
 ## 公共 CMake 模块
 

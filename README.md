@@ -31,6 +31,7 @@
 ## 实现内容
 
 - **资源与绑定**：顶点与索引、Uniform、动态偏移、Push Constants、纹理、Mipmap、OBJ / glTF。
+- **内存分配**：VMA 分配器、Buffer / Image 分配与绑定、staging 上传和持久映射 Uniform。
 - **渲染与图像**：PBR 材质预览、深度与模板、MSAA、离屏渲染、Input Attachments、延迟渲染、阴影与色调映射。
 - **计算与命令**：粒子模拟、Storage Image、间接绘制参数、命令复用、多线程录制、查询与管线缓存。
 - **API 与对象管理**：Geometry Shader、Mesh Shader、多视口、Multiview、Conditional Rendering、Dynamic Rendering、无窗口执行与 Vulkan-Hpp RAII。
