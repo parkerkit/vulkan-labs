@@ -116,7 +116,7 @@ flowchart LR
 
 [base.frag](../samples/02_advance/08_deferred_shading/shaders/base.frag)输出几何信息，[quad.frag](../samples/02_advance/08_deferred_shading/shaders/quad.frag)读取附件并计算环境项、漫反射、高光和距离衰减。Push Constant 选择直接显示颜色、法线、深度，或显示光照合成。
 
-Subpass Dependency 连接附件写入与后续读取；ImGui backend 的 Subpass 配置与界面命令所在位置对应。界面基础接入见 [ImGui 示例](../samples/02_advance/07_imgui/main.cpp)，附件画面见[延迟渲染预览](gallery.md#延迟渲染)。
+Subpass Dependency 连接附件写入与后续读取；ImGui backend 的 `PipelineInfoMain.Subpass` 配置与界面命令所在位置对应，延迟渲染中为第二个 Subpass（索引 1）。界面基础接入见 [ImGui 示例](../samples/02_advance/07_imgui/main.cpp)，附件画面见[延迟渲染预览](gallery.md#延迟渲染)。
 
 ### 离屏渲染与后处理
 

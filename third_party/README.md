@@ -12,7 +12,7 @@
 | --- | --- | --- | --- |
 | [GLFW](https://github.com/glfw/glfw) | 3.4.0 | `ThirdParty::glfw` | 静态库，窗口与输入 |
 | [GLM](https://github.com/g-truc/glm) | 1.0.3 | `ThirdParty::glm` | 头文件，数学运算 |
-| [Dear ImGui](https://github.com/ocornut/imgui) | 1.89.8 WIP | `ThirdParty::imgui` | 静态库，core / demo 与 GLFW、Vulkan backend |
+| [Dear ImGui](https://github.com/ocornut/imgui) | `v1.93.0` | `ThirdParty::imgui` | 静态库，core / demo 与 GLFW、Vulkan backend |
 | [meshoptimizer](https://github.com/zeux/meshoptimizer) | 1.2 | `ThirdParty::meshoptimizer` | 静态库，meshlet 构建与网格优化 |
 | [Vulkan Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator) | 3.3.0 | `ThirdParty::vma` | 静态库，Buffer / Image 内存分配与绑定 |
 | [stb](https://github.com/nothings/stb) | stb_image 2.30；stb_image_write 1.16 | `ThirdParty::stb_image`、`ThirdParty::stb_image_write` | 两个静态库，图像读写 |
@@ -39,7 +39,7 @@ target_link_libraries(my_target PRIVATE
 | --- | --- |
 | `<GLFW/glfw3.h>` | `ThirdParty::glfw` |
 | `<glm/glm.hpp>` | `ThirdParty::glm` |
-| `<imgui.h>` | `ThirdParty::imgui` |
+| `<imgui.h>`、`<backends/imgui_impl_glfw.h>`、`<backends/imgui_impl_vulkan.h>` | `ThirdParty::imgui` |
 | `<meshoptimizer.h>` | `ThirdParty::meshoptimizer` |
 | `<vk_mem_alloc.h>` | `ThirdParty::vma` |
 | `<stb_image.h>` | `ThirdParty::stb_image` |
@@ -95,3 +95,23 @@ TinyGLTF 使用 nlohmann/json 与 stb；当前配置没有启用 RapidJSON、Dra
 ## 更新依赖
 
 更新时记录来源、版本或提交，保留授权文件、源码声明和必要平台文件。构建适配放在对应 CMake 模块中；改变上游 API、backend 或可选功能时，同步检查使用处和新增依赖的许可。
+
+### Dear ImGui
+
+当前源码来自上游 [`v1.93.0`](https://github.com/ocornut/imgui/tree/v1.93.0)，
+固定提交为 `c1aaac65e896a45f81f47a4d68f9959e0f86c859`。保留所用文件在上游中的相对路径：
+
+- `imgui/` 根目录保存 core / demo 的五个 `.cpp`、`imgui.h`、`imgui_internal.h`、
+  `imconfig.h`、三个 `imstb_*.h` 和 `LICENSE.txt`。
+- `imgui/backends/` 保存 `imgui_impl_glfw.h/.cpp` 与 `imgui_impl_vulkan.h/.cpp`。
+- 不导入其他 backend、examples、docs、misc 或上游 Git 元数据。
+- 构建配置统一放在 [cmake/imgui.cmake](cmake/imgui.cmake)，不在第三方源码目录中维护额外 CMake。
+
+后续更新时，从同一 tag 或提交更新以上全部文件，避免混用不同版本的 core、头文件和 backend。
+项目定制编译选项放在构建适配中，不直接修改上游源码。
+
+Vulkan 接入使用单参数 `ImGui_ImplVulkan_Init()`，显式设置实例 API 版本、图形队列及其
+Queue Family、实际交换链图像数量，并通过 `PipelineInfoMain` 配置 RenderPass、Subpass 和采样数。
+字体纹理由新版 backend 管理，不再手工调用旧的字体上传、清理接口或 `Fonts->Build()`。
+外部描述符池需要提供 `VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE` 和 `VK_DESCRIPTOR_TYPE_SAMPLER`，
+并启用 `VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT`；当前示例保留已满足这些条件的池。

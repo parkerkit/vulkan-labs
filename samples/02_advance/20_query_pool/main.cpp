@@ -12,9 +12,9 @@
 #include <glm/gtx/quaternion.hpp>
 // clang-format on
 
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_vulkan.h>
 #include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_vulkan.h>
 
 #include <algorithm>
 #include <array>
@@ -1103,43 +1103,28 @@ private:
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.DisplaySize = ImVec2(static_cast<float>(k_width), static_cast<float>(k_height));
-    io.Fonts->Build();
 
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForVulkan(m_window, true);
 
-    ImGui_ImplVulkan_InitInfo init_info = {};
+    const auto queue_family_indices = FindQueueFamilies(m_physical_device);
+    ImGui_ImplVulkan_InitInfo init_info{};
+    init_info.ApiVersion = VK_API_VERSION_1_0;
     init_info.Instance = m_instance;
     init_info.PhysicalDevice = m_physical_device;
     init_info.Device = m_device;
-    init_info.Queue = m_present_queue;
+    init_info.QueueFamily = lvk_tidy::GetRequiredValue(queue_family_indices.graphics_family);
+    init_info.Queue = m_graphics_queue;
     init_info.DescriptorPool = m_imgui_descriptor_pool;
-    init_info.Subpass = 0;
     init_info.MinImageCount = m_min_image_count;
-    init_info.ImageCount = m_min_image_count;
-    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    init_info.ImageCount = static_cast<uint32_t>(m_swap_chain_images.size());
+    init_info.PipelineInfoMain.RenderPass = m_render_pass;
+    init_info.PipelineInfoMain.Subpass = 0;
+    init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
-    ImGui_ImplVulkan_Init(&init_info, m_render_pass);
-
-    vkResetCommandPool(m_device, m_command_pool, 0);
-
-    VkCommandBufferBeginInfo begin_info = {};
-    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    vkBeginCommandBuffer(m_command_buffers[m_current_frame], &begin_info);
-
-    ImGui_ImplVulkan_CreateFontsTexture(m_command_buffers[m_current_frame]);
-
-    VkSubmitInfo end_info = {};
-    end_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    end_info.commandBufferCount = 1;
-    end_info.pCommandBuffers = &m_command_buffers[m_current_frame];
-    vkEndCommandBuffer(m_command_buffers[m_current_frame]);
-
-    vkQueueSubmit(m_graphics_queue, 1, &end_info, VK_NULL_HANDLE);
-    vkDeviceWaitIdle(m_device);
-
-    ImGui_ImplVulkan_DestroyFontUploadObjects();
+    if (!ImGui_ImplVulkan_Init(&init_info)) {
+      throw std::runtime_error("failed to initialize ImGui Vulkan backend");
+    }
   }
 
   void GetQueryResult() {
