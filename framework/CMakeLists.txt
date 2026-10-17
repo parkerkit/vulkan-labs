@@ -17,6 +17,9 @@ add_library("${target_name}" STATIC
     include/framework/frame_scheduler.h
     include/framework/sample.h
     include/framework/application.h
+    include/framework/mesh.h
+    include/framework/shapes.h
+    include/framework/aabb.h
     src/imgui_layer.cpp
     src/window.cpp
     src/orbit_camera.cpp
@@ -32,6 +35,8 @@ add_library("${target_name}" STATIC
     src/swapchain.cpp
     src/frame_scheduler.cpp
     src/application.cpp
+    src/shapes.cpp
+    src/aabb.cpp
 )
 add_library(Framework::Framework ALIAS "${target_name}")
 
