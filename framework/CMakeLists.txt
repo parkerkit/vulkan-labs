@@ -8,6 +8,7 @@ add_library("${target_name}" STATIC
     include/framework/device.h
     include/framework/buffer.h
     include/framework/image.h
+    include/framework/texture2d.h
     include/framework/shader_module.h
     include/framework/pipeline.h
     include/framework/descriptors.h
@@ -28,6 +29,7 @@ add_library("${target_name}" STATIC
     src/device.cpp
     src/buffer.cpp
     src/image.cpp
+    src/texture2d.cpp
     src/shader_module.cpp
     src/pipeline.cpp
     src/descriptors.cpp
@@ -45,7 +47,7 @@ target_compile_definitions("${target_name}" PRIVATE GLFW_INCLUDE_NONE)
 target_include_directories("${target_name}" PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries("${target_name}"
     PUBLIC Vulkan::Vulkan ThirdParty::glm ThirdParty::imgui
-    PRIVATE ThirdParty::glfw ThirdParty::vma
+    PRIVATE ThirdParty::glfw ThirdParty::vma ThirdParty::stb_image
 )
 project_setup_target("${target_name}")
 project_setup_ide("${target_name}" FOLDER "Framework")

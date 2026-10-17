@@ -34,7 +34,7 @@ Mesh Shapes::Cube(float size, const glm::vec3& center) {
      {0.0F, 0.0F}, {1.0F, 0.0F}, {1.0F, 1.0F}, {0.0F, 1.0F}, {0.0F, 0.0F}, {1.0F, 0.0F}, {1.0F, 1.0F}, {0.0F, 1.0F},
      {0.0F, 0.0F}, {1.0F, 0.0F}, {1.0F, 1.0F}, {0.0F, 1.0F}, {0.0F, 0.0F}, {1.0F, 0.0F}, {1.0F, 1.0F}, {0.0F, 1.0F}}};
 
-  mesh.vertices.reserve(local_positions.size());
+  mesh.vertices.resize(local_positions.size());
   for (std::size_t i = 0; i < local_positions.size(); ++i) {
     mesh.vertices[i].positions = local_positions[i] + center;
     mesh.vertices[i].normals = normals[i];
@@ -82,7 +82,7 @@ Mesh Shapes::Sphere(float radius, std::uint32_t x_segments, std::uint32_t y_segm
       vertex.normals = normal_direction;
       vertex.texcoords = {x_segment, y_segment};
 
-      mesh.vertices.emplace_back(std::move(vertex));
+      mesh.vertices.emplace_back(vertex);
     }
   }
 
