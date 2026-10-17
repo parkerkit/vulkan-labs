@@ -75,7 +75,7 @@ function(samples_add_group group)
         if(shader_outputs)
             list(REMOVE_DUPLICATES shader_outputs)
             add_custom_target("${base_target_name}_shaders" DEPENDS ${shader_outputs})
-            set_target_properties("${base_target_name}_shaders" PROPERTIES FOLDER "Samples/Shaders")
+            project_setup_ide("${base_target_name}_shaders" FOLDER "Samples/Shaders")
         endif()
 
         foreach(sample_entry IN LISTS sample_entries)
@@ -100,10 +100,7 @@ function(samples_add_group group)
                 "PROJECT_ASSETS_DIR=\"${PROJECT_ASSETS_DIR}/\""
                 "PROJECT_SHADER_DIR=\"${PROJECT_SHADER_DIR}/\""
             )
-            set_target_properties("${target_name}" PROPERTIES
-                FOLDER "Samples/${group_name}"
-                VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:${target_name}>"
-            )
+            project_setup_ide("${target_name}" FOLDER "Samples/${group_name}")
             if(shader_outputs)
                 add_dependencies("${target_name}" "${base_target_name}_shaders")
             endif()

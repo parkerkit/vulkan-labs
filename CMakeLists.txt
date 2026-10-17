@@ -14,6 +14,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 option(BUILD_SAMPLES "Build the Vulkan samples" ON)
+option(BUILD_FRAMEWORK "Build the reusable Vulkan framework" ON)
+option(BUILD_FRAMEWORK_EXAMPLES "Build the framework interactive examples" ON)
 option(ENABLE_CLANG_TIDY "Enable clang-tidy for project targets" ON)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -34,6 +36,10 @@ file(TO_CMAKE_PATH "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders" PROJECT_SHADER_DI
 find_package(Vulkan REQUIRED)
 
 add_subdirectory(third_party)
+
+if(BUILD_FRAMEWORK)
+    add_subdirectory(framework)
+endif()
 
 if(BUILD_SAMPLES)
     add_subdirectory(samples)

@@ -1,8 +1,18 @@
 # vulkan-labs
 
-基于 **C++20 与 Vulkan** 的图形和计算实验。通过独立可运行的示例，展示资源管理、渲染管线、GPU 计算与多阶段渲染的具体实现。
+基于 **C++20 与 Vulkan** 的图形和计算实验项目，包含独立技术示例与可复用渲染框架。
 
-[效果展示](docs/gallery.md) · [构建与运行](docs/getting-started.md) · [示例目录](docs/samples.md) · [文档](docs/README.md)
+[效果展示](docs/gallery.md) · [构建与运行](docs/getting-started.md) · [示例目录](docs/samples.md) · [渲染框架](framework/README.md) · [文档](docs/README.md)
+
+## 代码入口
+
+| 目录 | 职责 | 阅读入口 |
+| --- | --- | --- |
+| `samples/` | 按主题组织的独立程序，各自管理设备、资源、命令和同步 | [示例目录](docs/samples.md) |
+| `framework/` | Vulkan 1.3 运行时、资源封装、帧调度与 ImGui 集成，导出 `Framework::Framework` | [框架说明](framework/README.md) |
+
+`samples/` 与 `framework/` 共享公共构建配置和第三方依赖；`samples/` 不链接框架。
+独立示例的 `main.cpp`、`mainN.cpp` 对应不同可执行 target，便于连贯阅读各自的实现与 GLSL。
 
 ## 画面预览
 
@@ -28,19 +38,17 @@
 
 更多附件视图、滤镜对比与 Cubemap 画面见[效果展示](docs/gallery.md)。
 
-## 实现内容
+## 技术主题
 
 - **资源与绑定**：顶点与索引、Uniform、动态偏移、Push Constants、纹理、Mipmap、OBJ / glTF。
 - **内存分配**：VMA 分配器、Buffer / Image 分配与绑定、staging 上传和持久映射 Uniform。
-- **渲染与图像**：PBR 材质预览、深度与模板、MSAA、离屏渲染、Input Attachments、延迟渲染、阴影与色调映射。
+- **渲染与图像**：PBR 材质、深度与模板、MSAA、离屏渲染、Input Attachments、延迟渲染、阴影与色调映射。
 - **计算与命令**：粒子模拟、Storage Image、间接绘制参数、命令复用、多线程录制、查询与管线缓存。
 - **API 与对象管理**：Geometry Shader、Mesh Shader、多视口、Multiview、Conditional Rendering、Dynamic Rendering、无窗口执行与 Vulkan-Hpp RAII。
 
-示例保留各自的初始化、资源创建和命令提交流程，技术实现可以从 `main.cpp`、`mainN.cpp` 与对应 GLSL 连贯阅读。[示例目录](docs/samples.md)列出各版本的独立可执行 target、源码入口和用途。
+## 构建与运行
 
-## 开始运行
-
-开发入口使用 Windows、MSVC x64 和 Ninja。准备 CMake 3.25+、Vulkan SDK 与 `clang-tidy`，在已初始化 MSVC x64 环境的开发终端中执行：
+Windows 开发入口使用 MSVC x64 和 Ninja。准备 CMake 3.25+、Vulkan SDK 与 `clang-tidy`，在已初始化 MSVC x64 环境的开发终端中执行：
 
 ```powershell
 git submodule update --init --recursive
@@ -51,7 +59,7 @@ cmake --build --preset msvc-debug-tidy --target 01_01_hello_triangle
 
 Shader 随 target 自动编译。完整环境要求、其他预设和 Visual Studio 入口见[构建与运行](docs/getting-started.md)。
 
-## 阅读代码
+## 技术文档
 
 | 目的 | 入口 |
 | --- | --- |
@@ -61,6 +69,7 @@ Shader 随 target 自动编译。完整环境要求、其他预设和 Visual Stu
 | 跟踪渲染和计算的数据流 | [专题实现](docs/rendering-techniques.md) |
 | 了解模块与构建依赖 | [工程组织](docs/project-layout.md) |
 | 修改代码和使用开发工具 | [开发指南](docs/development.md) |
+| 使用框架接口与交互程序 | [渲染框架](framework/README.md) |
 
 ## 许可与参考
 

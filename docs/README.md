@@ -20,4 +20,5 @@
 | [专题实现](rendering-techniques.md) | 结合源码说明资源绑定、多阶段渲染、计算与 API 使用方式 |
 | [工程组织](project-layout.md) | 目录职责、CMake 模块、依赖边界与 Shader 构建 |
 | [开发指南](development.md) | 修改入口、静态检查、提交工具与文档素材 |
+| [渲染框架](../framework/README.md) | 独立框架、交互立方体、资源生命周期及后续展示接入 |
 | [第三方依赖](../third_party/README.md) | 本地依赖版本、target、共享实现和许可 |

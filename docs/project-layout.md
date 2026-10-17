@@ -4,13 +4,16 @@
 
 ## 模块职责
 
-`vulkan-labs` 通过公共 CMake 模块共享编译策略，通过独立可执行程序展示 Vulkan 的使用。每个示例直接组织自身的设备、资源、命令与同步；公共构建层负责依赖、工具和 Shader 产物。
+`vulkan-labs` 通过公共 CMake 模块共享编译策略，通过独立可执行程序展示 Vulkan 的使用。
+`samples/` 中每个示例直接组织自身的设备、资源、命令与同步；
+`framework/` 提供窗口、设备、资源和帧调度等公共运行时，并包含交互立方体程序。公共构建层负责依赖、工具和 Shader 产物。
 
 ```text
 .
-├── CMakeLists.txt          项目信息、语言标准、公共选项和子目录编排
-├── CMakePresets.json       编译器、生成器和构建目录
+├── CMakeLists.txt         项目信息、语言标准、公共选项和子目录编排
+├── CMakePresets.json      编译器、生成器和构建目录
 ├── cmake/                 公共编译配置与 Shader 编译函数
+├── framework/             独立 Vulkan 框架与框架交互程序
 ├── samples/               按主题分组的独立程序与 GLSL
 ├── third_party/           本地依赖源码、共享实现与 CMake 适配
 ├── assets/                模型、纹理等资源子模块
@@ -29,6 +32,9 @@ flowchart TD
     Root --> SDK["Vulkan SDK"]
     Root --> ThirdParty["第三方适配"]
     Root --> Samples["samples/CMakeLists.txt"]
+    Root --> Framework["framework/CMakeLists.txt"]
+    Framework --> FrameworkLibrary["Framework::Framework"]
+    FrameworkLibrary --> Cube["framework_interactive_cube"]
     Policy --> Executable["示例可执行 target"]
     SDK --> Executable
     ThirdParty --> Executable
@@ -37,7 +43,13 @@ flowchart TD
     Shaders --> Executable
 ```
 
-根构建统一启用 C++20、关闭语言扩展，并提供 `BUILD_SAMPLES` 和 `ENABLE_CLANG_TIDY` 选项。Vulkan 通过 `find_package(Vulkan REQUIRED)` 获取，其他依赖由本地 target 提供。
+根构建统一启用 C++20、关闭语言扩展，并提供 `BUILD_SAMPLES`、`BUILD_FRAMEWORK`、
+`BUILD_FRAMEWORK_EXAMPLES` 和 `ENABLE_CLANG_TIDY` 选项。Vulkan 通过
+`find_package(Vulkan REQUIRED)` 获取，其他依赖由本地 target 提供。
+
+`framework/` 导出 `Framework::Framework`，`samples/` 不依赖它。框架的交互程序为
+`framework_interactive_cube`，位于 `framework/examples/interactive_cube/`。
+具体接口和运行方式见[渲染框架](../framework/README.md)。
 
 samples 的公共构建逻辑为每个程序链接 Vulkan、GLFW、GLM、ImGui、meshoptimizer、stb、tinyobjloader、TinyGLTF 和 VMA；各程序按需要使用这些能力。依赖的 include、链接要求和共享实现见[第三方依赖](../third_party/README.md)。
 
@@ -52,6 +64,8 @@ samples 的公共构建逻辑为每个程序链接 Vulkan、GLFW、GLM、ImGui�
 | [ProjectShaders.cmake](../cmake/ProjectShaders.cmake) | `project_compile_shader(source output)`：生成 SPIR-V 和 depfile |
 
 `project_setup_target()` 只应用公共编译策略。业务依赖、资源路径和 Shader 由所属目录声明。
+
+`project_compile_shader()` 通过 `TARGET_ENV` 指定 Shader 目标环境，通过 `OPTIONS` 传递其他编译参数。
 
 第三方编译 target 使用独立策略：关闭 tidy、告警及告警视为错误，头文件以 `SYSTEM` 路径传播。自有 target 的检查规则不会设置到第三方编译 target 上。
 
@@ -94,9 +108,12 @@ samples/06_extensions/04_mesh_shader/shaders/base.mesh
 bin/shaders/06_04_base_mesh.spv
 ```
 
-编译函数创建输出目录，调用 `glslc -MD -MF`，通过 depfile 跟踪 GLSL include。示例的 `<原 target 名>_shaders` target 汇总输出，同目录各可执行 target 共用这个构建步骤。
+编译函数创建输出目录，调用 `glslc -MD -MF`，通过 depfile 跟踪 GLSL include。示例的 `<基础 target 名>_shaders` target 汇总输出，同目录各可执行 target 共用这个构建步骤。
 
 构建逻辑还读取同目录各入口及公共源码中 `PROJECT_SHADER_DIR "文件名.spv"` 形式的引用，加入相应产物依赖，以支持跨示例复用。各版本引用的 Shader 统一汇入该示例共享的 Shader target。
+
+交互立方体显式使用 `TARGET_ENV vulkan1.3`，通过 `framework_interactive_cube_shaders` 汇总编译依赖。
+产物同样位于 `bin/shaders/`，文件名为 `framework_interactive_cube_vert.spv` 和 `framework_interactive_cube_frag.spv`，程序通过 `PROJECT_SHADER_DIR` 加文件名加载。
 
 ## 路径与产物
 
