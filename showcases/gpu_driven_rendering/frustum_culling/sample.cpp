@@ -501,6 +501,9 @@ void Sample::OnUpdate(const fw::FrameContext& frame, const fw::InputState& input
   CameraUniform uniform{};
   auto model = glm::rotate(glm::mat4{1.0F}, m_rotation, glm::vec3{0.0F, 1.0F, 0.0F});
   const float aspect = static_cast<float>(frame.extent.width) / static_cast<float>(frame.extent.height);
+  // 当前模型只进行刚性旋转，世界空间球心随模型变换，包围球半径保持不变。
+  const auto scene_center = glm::vec3{model * glm::vec4{m_scene_bounds.GetCenter(), 1.0F}};
+  m_camera.SetSceneBoundingSphere(scene_center, m_scene_bounds.GetBoundingRadius());
   uniform.model_view_projection = m_camera.GetProjectionMatrix(aspect) * m_camera.GetViewMatrix() * model;
   // 按帧槽位而非交换链图像选择缓冲，该槽位的 fence 已在更新回调前等待完成。
   m_uniforms.at(frame.frame_index).Write(std::as_bytes(std::span{&uniform, 1}));

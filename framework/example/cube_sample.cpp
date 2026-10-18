@@ -17,6 +17,7 @@
 #include <sstream>
 #include <utility>
 
+#include "framework/aabb.h"
 #include "framework/device.h"
 #include "framework/frame_scheduler.h"
 #include "framework/shader_module.h"
@@ -53,6 +54,7 @@ const std::array<Vertex, 24> k_vertices{{
 }};
 constexpr std::array<uint16_t, 36> k_indices{0,  1,  2,  2,  3,  0,  4,  5,  6,  6,  7,  4,  8,  9,  10, 10, 11, 8,
                                              12, 13, 14, 14, 15, 12, 16, 17, 18, 18, 19, 16, 20, 21, 22, 22, 23, 20};
+const fw::AABB k_cube_bounds{glm::vec3{-1.0F}, glm::vec3{1.0F}};
 
 void BeginAttachments(const fw::FrameContext& frame, const fw::Image& depth, const std::array<float, 4>& clear_color) {
   // 深度图按帧槽位独占且每帧清空，槽位 fence 已完成，可丢弃其上次内容。
@@ -129,6 +131,7 @@ void CubeSample::OnInitialize(const fw::SampleContext& context, const fw::Swapch
   CreateDescriptors();
   // 应用只在交换链重建时通知 OnResize，初始附件由初始化主动建立。
   OnResize(swapchain);
+  m_camera.ResetCamera(k_cube_bounds, static_cast<float>(m_extent.width) / static_cast<float>(m_extent.height));
   std::cout << "GPU: " << std::data(m_device->GetInfo().properties.deviceName) << '\n'
             << "LMB drag: orbit | RMB drag: pan | Wheel: zoom | WASD/QE: move\n"
             << "Space: pause/resume | Home: reset camera | R: reset all | Esc: close\n";
@@ -274,7 +277,7 @@ void CubeSample::OnResize(const fw::SwapchainInfo& swapchain) {
 }
 
 void CubeSample::ResetAll() noexcept {
-  m_camera.Reset();
+  m_camera.ResetCamera(k_cube_bounds, static_cast<float>(m_extent.width) / static_cast<float>(m_extent.height));
   m_rotation = 0.0F;
   m_rotation_speed = 0.5F;
   m_enable_rotation = true;
@@ -287,6 +290,9 @@ void CubeSample::OnUpdate(const fw::FrameContext& frame, const fw::InputState& i
   }
   if (input.IsPressed(fw::Key::R)) {
     ResetAll();
+  } else if (input.IsPressed(fw::Key::Home)) {
+    m_camera.ResetCamera(k_cube_bounds,
+                         static_cast<float>(frame.extent.width) / static_cast<float>(frame.extent.height));
   }
   m_camera.Update(input, delta_seconds);
   if (m_enable_rotation) {
@@ -339,7 +345,7 @@ void CubeSample::OnGui() {
     ImGui::SliderAngle("Angle", &m_rotation, -180.0F, 180.0F);
     ImGui::ColorEdit3("Background", m_clear_color.data());
     if (ImGui::Button("Reset camera")) {
-      m_camera.Reset();
+      m_camera.ResetCamera(k_cube_bounds, static_cast<float>(m_extent.width) / static_cast<float>(m_extent.height));
     }
     ImGui::SameLine();
     if (ImGui::Button("Reset all")) {

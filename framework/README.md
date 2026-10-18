@@ -85,6 +85,22 @@ ImGui 捕获鼠标或键盘时，相应输入会从传给示例的快照中清�
 资源工厂直接返回对象或 `std::unique_ptr`，失败通过 C++ 异常报告。
 `FrameScheduler::BeginFrame()` 返回 `std::optional<FrameContext>`，空值表示窗口暂停输出或交换链刚完成重建。
 
+## 相机取景与裁剪范围
+
+`OrbitCamera::ResetCamera(bounds, aspect)` 恢复默认观察方向并按传入边界和宽高比重新取景，
+同时在相机私有成员中保存取景尺度和场景的世界空间包围球。
+`GetProjectionMatrix()` 根据当前相机位姿计算包围球沿观察方向的深度范围，自动更新近远裁剪距离。
+默认增加半径 2% 的间隙，并考虑 float 精度；相机进入包围球或场景位于身后时仍保证有效的正近裁剪距离。
+未设置场景包围球的相机继续使用默认裁剪范围。
+
+平移、旋转、缩放和重新取景均通过同一投影计算路径更新裁剪范围。
+相机的 `Update()` 负责交互移动；Home 及重置按钮由示例调用 `ResetCamera()`，传入场景边界和当前宽高比。
+几何或模型变换改变时，示例可通过 `SetSceneBoundingSphere(center, radius)` 更新世界空间包围球，
+该方法不改变相机位姿和交互使用的取景尺度；缩放或其他模型变换须由调用者计入球心和半径。
+
+`GetProjectionMatrix(aspect, additional_clip_points)` 可额外纳入调试几何的世界空间点，仅扩展近远裁剪范围。
+此操作不改变观察相机位姿或横纵视野，线框仍须位于观察相机的屏幕范围内。
+
 ## 应用与回调
 
 `Application::Run()` 根据 `ApplicationDesc` 创建窗口、设备、帧调度器和可选 ImGui 层，再通过工厂创建 `ISample`。
