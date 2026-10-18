@@ -14,13 +14,18 @@
       "installDir": "${sourceDir}/build/${presetName}/install",
       "cacheVariables": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "ENABLE_CLANG_TIDY": "ON"
+        "ENABLE_CLANG_TIDY": "OFF"
       }
     },
     {
       "name": "env-msvc",
       "hidden": true,
       "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
       "architecture": {
         "value": "x64",
         "strategy": "external"
@@ -53,20 +58,90 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
+    },
+    {
+      "name": "env-linux",
+      "hidden": true,
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "linux-debug",
+      "displayName": "Linux Debug",
+      "inherits": "env-linux",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "linux-debug-tidy",
+      "displayName": "Linux Debug With Clang-Tidy",
+      "inherits": "linux-debug",
+      "cacheVariables": {
+        "ENABLE_CLANG_TIDY": "ON"
+      }
+    },
+    {
+      "name": "linux-release",
+      "displayName": "Linux Release",
+      "inherits": "env-linux",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
     }
   ],
   "buildPresets": [
     {
+      "name": "build-windows",
+      "hidden": true,
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "build-linux",
+      "hidden": true,
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
       "name": "msvc-debug",
+      "inherits": "build-windows",
       "configurePreset": "msvc-debug"
     },
     {
       "name": "msvc-debug-tidy",
+      "inherits": "build-windows",
       "configurePreset": "msvc-debug-tidy"
     },
     {
       "name": "msvc-release",
+      "inherits": "build-windows",
       "configurePreset": "msvc-release"
+    },
+    {
+      "name": "linux-debug",
+      "inherits": "build-linux",
+      "configurePreset": "linux-debug"
+    },
+    {
+      "name": "linux-debug-tidy",
+      "inherits": "build-linux",
+      "configurePreset": "linux-debug-tidy"
+    },
+    {
+      "name": "linux-release",
+      "inherits": "build-linux",
+      "configurePreset": "linux-release"
     }
   ]
 }

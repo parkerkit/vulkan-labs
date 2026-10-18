@@ -48,16 +48,29 @@
 
 ## 构建与运行
 
-Windows 开发入口使用 MSVC x64 和 Ninja。准备 CMake 3.25+、Vulkan SDK 与 `clang-tidy`，在已初始化 MSVC x64 环境的开发终端中执行：
+Windows 和 Linux 均使用 CMake 3.25+、Ninja 与 Vulkan 开发工具。先在仓库根目录初始化资源子模块：
 
-```powershell
+```sh
 git submodule update --init --recursive
-cmake --preset msvc-debug-tidy
-cmake --build --preset msvc-debug-tidy --target 01_01_hello_triangle
-.\build\msvc-debug-tidy\bin\01_01_hello_triangle.exe
 ```
 
-Shader 随 target 自动编译。完整环境要求、其他预设和 Visual Studio 入口见[构建与运行](docs/getting-started.md)。
+Windows 使用 MSVC x64，在已初始化 MSVC 环境的开发终端中执行：
+
+```powershell
+cmake --preset msvc-debug
+cmake --build --preset msvc-debug --target 01_01_hello_triangle
+.\build\msvc-debug\bin\01_01_hello_triangle.exe
+```
+
+Linux 使用 `linux-debug` 预设：
+
+```bash
+cmake --preset linux-debug
+cmake --build --preset linux-debug --target 01_01_hello_triangle
+./build/linux-debug/bin/01_01_hello_triangle
+```
+
+Shader 随 target 自动编译。两个平台均提供 Debug、Release 和启用 `clang-tidy` 的 Debug 预设。依赖、预设选择和 Visual Studio 入口见[构建与运行](docs/getting-started.md)。
 
 ## 技术文档
 

@@ -143,8 +143,8 @@ struct Window {
 
   void PollEvents() const noexcept { glfwPollEvents(); }
 
-  GLFWwindow* window{};
   vk::Extent2D extent{};
+  GLFWwindow* window{};
   bool resized{};
 };
 

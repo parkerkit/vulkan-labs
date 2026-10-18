@@ -7,6 +7,7 @@
 #include <array>
 #include <bit>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -776,10 +777,10 @@ private:
     // Initial particle positions on a circle
     std::vector<Particle> particles(k_particle_count);
     for (auto& particle : particles) {
-      float r = 0.25F * sqrt(rnd_dist(rnd_engine));
+      float r = 0.25F * std::sqrt(rnd_dist(rnd_engine));
       float theta = rnd_dist(rnd_engine) * 2.0F * 3.14159265358979323846F;
-      float x = r * cos(theta) * k_height / k_width;
-      float y = r * sin(theta);
+      float x = r * std::cos(theta) * k_height / k_width;
+      float y = r * std::sin(theta);
       particle.position = glm::vec2(x, y);
       particle.velocity = glm::normalize(glm::vec2(x, y)) * 0.00025F;
       particle.color = glm::vec4(rnd_dist(rnd_engine), rnd_dist(rnd_engine), rnd_dist(rnd_engine), 1.0F);

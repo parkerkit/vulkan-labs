@@ -4,9 +4,11 @@
 
 `samples/` 包含 9 个主题分组、73 个独立可执行程序。表中名称就是构建使用的 target，点击名称进入对应源码。
 
-```powershell
-cmake --build --preset msvc-debug-tidy --target <target>
+```sh
+cmake --build --preset <preset> --target <target>
 ```
+
+先按[构建与运行](getting-started.md#选择配置)配置当前平台的预设，再将 `<preset>` 和 `<target>` 替换为对应名称。
 
 同一示例的不同实现使用独立入口和 target，可分别构建运行，命名规则见[多个入口与目标](#多个入口与目标)。
 

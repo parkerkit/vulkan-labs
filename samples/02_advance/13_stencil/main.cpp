@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cstring>
 #include <fstream>
 #include <glm/glm.hpp>
 #include <iostream>

@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <numbers>
@@ -305,7 +306,7 @@ private:
     vertices.emplace_back(Vertex{{0.F, radius, 0.F}, {0.F, radius, 0.F}});
 
     // 每一层，即纬线所在的圈
-    for (size_t i = 1; i < longitude - 1; ++i) {
+    for (size_t i = 1; i < static_cast<size_t>(longitude) - 1; ++i) {
       auto r = radius * std::sin(static_cast<float>(i) * delta_longitude);
       auto y = radius * std::cos(static_cast<float>(i) * delta_longitude);
 

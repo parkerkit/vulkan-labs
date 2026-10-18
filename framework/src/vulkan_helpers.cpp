@@ -10,9 +10,4 @@ void Check(VkResult result, std::string_view operation) {
     throw std::runtime_error(std::string{operation} + " (VkResult " + std::to_string(static_cast<int>(result)) + ")");
   }
 }
-void Require(bool condition, std::string_view message) {
-  if (!condition) {
-    throw std::runtime_error(std::string{message});
-  }
-}
 }  // namespace fw::detail

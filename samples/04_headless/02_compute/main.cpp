@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <numbers>
@@ -328,9 +329,6 @@ private:
 
   void CreateComputeSyncObjects() {
     m_compute_in_flight_fences.resize(k_max_frames_in_flight);
-
-    VkSemaphoreCreateInfo semaphore_info = {};
-    semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
     VkFenceCreateInfo fence_info = {};
     fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;

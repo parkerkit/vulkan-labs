@@ -1,4 +1,6 @@
+#ifdef _MSC_VER
 #pragma warning(disable : 4996)  // 解决 stb_image_write.h 文件中的`sprintf`不安全警告
+#endif
 
 #include <vulkan/vulkan.h>
 
@@ -17,6 +19,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <numbers>

@@ -19,6 +19,8 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cinttypes>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <numbers>
@@ -309,9 +311,9 @@ private:
 
     ImGui::Begin("Display Infomation");
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
-    ImGui::Text("Cube passed samples: %llu", m_passed_samples[0]);
+    ImGui::Text("Cube passed samples: %" PRIu64, m_passed_samples[0]);
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
-    ImGui::Text("Tetra passed samples: %llu", m_passed_samples[1]);
+    ImGui::Text("Tetra passed samples: %" PRIu64, m_passed_samples[1]);
     ImGui::End();
 
     ImGui::Render();

@@ -15,7 +15,7 @@
 
 ## clang-tidy
 
-`ENABLE_CLANG_TIDY` 默认开启。公共 CMake 模块把检查应用于自有 target，第三方编译 target 关闭 tidy，第三方头文件通过 `SYSTEM` include 接入。
+使用 `msvc-debug-tidy` 或 `linux-debug-tidy` 构建时，CMake 对参与编译的自有 target 运行 `clang-tidy`。直接配置 CMake 时，`ENABLE_CLANG_TIDY` 默认开启。第三方头文件通过 `SYSTEM` include 接入，第三方 target 关闭这项检查。
 
 检查集合、命名约定和头文件过滤见根目录 [.clang-tidy](../.clang-tidy)。普通构建按该配置报告诊断；提交 hook 另外通过 `--warnings-as-errors` 将选定诊断提升为错误。
 

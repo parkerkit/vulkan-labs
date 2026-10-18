@@ -1,5 +1,7 @@
 
+#ifdef _MSC_VER
 #pragma warning(disable : 4996)  // 解决 stb_image_write.h 文件中的`sprintf`不安全警告
+#endif
 
 #define GLFW_INCLUDE_VULKAN  // 定义这个宏之后 glfw3.h 文件就会包含 Vulkan 的头文件
 #include <GLFW/glfw3.h>
@@ -24,6 +26,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <optional>

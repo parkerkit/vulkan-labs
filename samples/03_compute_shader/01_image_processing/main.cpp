@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cstring>
 #include <fstream>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -2034,8 +2035,10 @@ private:
 
       source_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
       destination_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    } else if (VK_IMAGE_LAYOUT_GENERAL == new_layout && VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-      barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    } else if (VK_IMAGE_LAYOUT_GENERAL == new_layout &&
+               (VK_IMAGE_LAYOUT_UNDEFINED == old_layout || VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL == old_layout)) {
+      barrier.srcAccessMask =
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL == old_layout ? VK_ACCESS_TRANSFER_WRITE_BIT : VK_ACCESS_NONE;
       barrier.dstAccessMask = VK_ACCESS_NONE;
 
       source_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;

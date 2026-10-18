@@ -247,6 +247,3 @@ CheckOptions:
     value: 1
   - key: cppcoreguidelines-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic
     value: true
-ExtraArgs:
-  - "-fexceptions"
-  - "/EHsc"

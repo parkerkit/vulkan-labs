@@ -1,6 +1,8 @@
 // gltf
 
+#ifdef _MSC_VER
 #pragma warning(disable : 4996)
+#endif
 
 #define TINYGLTF_IMPLEMENTATION
 #define TINYGLTF_USE_CPP14

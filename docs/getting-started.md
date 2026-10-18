@@ -4,7 +4,9 @@
 
 ## 环境
 
-公共预设使用 **Windows、MSVC x64 与 Ninja**。安装 Visual Studio 2026 的 C++ 桌面开发工具和 Windows SDK，并准备以下工具：
+### Windows
+
+Windows 预设使用 **MSVC x64 与 Ninja**。安装 Visual Studio 2026 的 C++ 桌面开发工具和 Windows SDK，并准备以下工具：
 
 | 依赖 | 要求 |
 | --- | --- |
@@ -12,12 +14,26 @@
 | 编译器 | 支持 C++20 的 MSVC x64 工具链 |
 | Ninja | 位于 `PATH` |
 | Vulkan SDK | Vulkan 头文件、Loader、`glslc`；Debug 示例所用的 Validation Layers |
-| clang-tidy | 位于 `PATH`，默认参与自有 C/C++ target 的编译 |
+| clang-tidy | 使用 `msvc-debug-tidy` 时需要，加入 `PATH` |
 | GPU 与驱动 | 支持所选示例请求的 API、特性、扩展和图像格式 |
 
 Vulkan 开发工具可从 [LunarG](https://vulkan.lunarg.com/sdk/home#windows) 获取。安装 SDK 不会改变设备本身支持的特性。
 
-CMake 预设不初始化 MSVC 环境。以下命令在仓库根目录、已初始化 MSVC x64 的开发终端中执行；也可以使用[辅助脚本](#辅助脚本)。
+在已初始化 MSVC x64 环境的开发终端中运行 CMake，也可以使用[辅助脚本](#辅助脚本)。
+
+### Linux
+
+Linux 预设使用 Ninja 和 CMake 检测到的本机编译器。构建需要 CMake 3.25+、支持项目所用 C++20 特性的编译器及标准库（例如 GCC 13）、Vulkan 头文件与 Loader、`glslc`，以及 GLFW 的 X11 开发依赖。运行图形示例需要可用的 X11 显示服务、Vulkan 驱动和 Debug 示例请求的 Validation Layers。
+
+在 Ubuntu 24.04 上可安装以下软件包：
+
+```bash
+sudo apt install build-essential cmake ninja-build libvulkan-dev glslc \
+  libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev \
+  vulkan-validationlayers
+```
+
+使用 `linux-debug-tidy` 时另需安装 `clang-tidy`，并确保它位于 `PATH`。
 
 ## 获取代码与资源
 
@@ -41,20 +57,23 @@ git submodule update --init --recursive
 
 ## 构建第一个程序
 
-```powershell
-cmake --preset msvc-debug-tidy
-cmake --build --preset msvc-debug-tidy --target 01_01_hello_triangle
-.\build\msvc-debug-tidy\bin\01_01_hello_triangle.exe
-```
-
-CMake 为目标编译 GLSL、生成 SPIR-V，并编译和链接程序。选择其他主题时替换 target：
+在仓库根目录执行对应平台的命令。Windows 使用 MSVC x64 开发终端。
 
 ```powershell
-cmake --build --preset msvc-debug-tidy --target 02_08_deferred_shading
-.\build\msvc-debug-tidy\bin\02_08_deferred_shading.exe
+cmake --preset msvc-debug
+cmake --build --preset msvc-debug --target 01_01_hello_triangle
+.\build\msvc-debug\bin\01_01_hello_triangle.exe
 ```
 
-全部名称见[示例目录](samples.md)。省略 `--target` 会构建全部启用的目标。
+Linux 使用以下命令：
+
+```bash
+cmake --preset linux-debug
+cmake --build --preset linux-debug --target 01_01_hello_triangle
+./build/linux-debug/bin/01_01_hello_triangle
+```
+
+CMake 为目标编译 GLSL、生成 SPIR-V，并编译和链接程序。构建其他示例时，从[示例目录](samples.md)选择 target。省略 `--target` 会构建全部启用的目标。
 
 ## 运行 Mesh Shader 示例
 
@@ -71,35 +90,31 @@ cmake --build --preset msvc-debug-tidy --target 02_08_deferred_shading
 设备筛选条件见[主程序](../samples/06_extensions/04_mesh_shader/main.cpp)中的 `IsDeviceSuitable()` 和 `SupportsMeshShaderLimits()`。准备上述资源后，在已初始化 MSVC x64 环境的终端中执行：
 
 ```powershell
-cmake --preset msvc-debug-tidy
-cmake --build --preset msvc-debug-tidy --target 06_04_mesh_shader
-.\build\msvc-debug-tidy\bin\06_04_mesh_shader.exe
+cmake --preset msvc-debug
+cmake --build --preset msvc-debug --target 06_04_mesh_shader
+.\build\msvc-debug\bin\06_04_mesh_shader.exe
 ```
 
 模型分块效果与相机操作见[效果展示](gallery.md#mesh-shader)，数据流见[Mesh Shader 与 meshlet](rendering-techniques.md#mesh-shader-与-meshlet)，着色器产物规则见[Shader 构建](project-layout.md#shader-构建)。
 
 ## 选择配置
 
-| Preset | 类型 | 编译器 / 生成器 | clang-tidy |
+| 类型 | Windows（MSVC x64） | Linux（本机编译器） | clang-tidy |
 | --- | --- | --- | --- |
-| `msvc-debug` | Debug | MSVC x64 / Ninja | 开启 |
-| `msvc-debug-tidy` | Debug | MSVC x64 / Ninja | 开启，显式声明 |
-| `msvc-release` | Release | MSVC x64 / Ninja | 开启 |
+| Debug | `msvc-debug` | `linux-debug` | 关闭 |
+| Debug + 静态检查 | `msvc-debug-tidy` | `linux-debug-tidy` | 开启 |
+| Release | `msvc-release` | `linux-release` | 关闭 |
+
+运行 `cmake --list-presets=all` 可以查看当前宿主系统的配置和构建预设。日常调试使用 Debug，构建优化版本使用 Release，需要随编译运行静态检查时使用 Debug + 静态检查。
 
 配置和构建使用同名 preset。输出位于各自的 `build/<preset>/` 下：
 
 | 输出 | 路径 |
 | --- | --- |
-| 可执行程序 | `bin/<target>.exe` |
+| 可执行程序 | Windows 为 `bin/<target>.exe`，Linux 为 `bin/<target>` |
 | 库 | `lib/` |
 | SPIR-V | `bin/shaders/` |
 | 编译数据库 | `compile_commands.json` |
-
-根构建选项为 `BUILD_SAMPLES=ON` 和 `ENABLE_CLANG_TIDY=ON`。需要关闭静态检查时，在配置阶段显式覆盖：
-
-```powershell
-cmake --preset msvc-debug -DENABLE_CLANG_TIDY=OFF
-```
 
 个人路径与配置可以保存在已忽略的 `CMakeUserPresets.json` 中。
 
@@ -141,7 +156,7 @@ CMake 将资源绝对路径写入编译定义：
 Headless、部分 Vulkan-Hpp、Blit 和管线缓存示例会向进程工作目录写入图像或文件。运行它们时可以先进入输出目录：
 
 ```powershell
-Set-Location build/msvc-debug-tidy/bin
+Set-Location build/msvc-debug/bin
 .\04_01_render.exe
 ```
 
@@ -153,7 +168,7 @@ Set-Location build/msvc-debug-tidy/bin
 | --- | --- |
 | 找不到 `cl` 或标准库头文件 | 使用 MSVC x64 开发终端，或调用自动初始化环境的脚本 |
 | 配置时找不到 Vulkan 或 `glslc` | 安装 SDK，确认 `VULKAN_SDK` 与工具路径 |
-| 配置时找不到 `clang-tidy` | 将工具加入 `PATH`；该工具在默认配置中是必需项 |
+| 配置时找不到 `clang-tidy` | 启用 `ENABLE_CLANG_TIDY` 时，将工具加入 `PATH` |
 | 模型或纹理加载失败 | 初始化资源子模块，核对源码引用和文件路径 |
 | 无法选出设备或创建特定功能 | 对照源码中的设备选择、扩展和 feature 请求，确认 GPU 与驱动支持 |
 | 改动 Shader 后画面未变化 | 构建对应 target，并运行同一构建目录的可执行文件 |

@@ -3,6 +3,7 @@
 
 #define GLM_FORCE_RADIANS            // glm函数的参数使用弧度
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE  // 透视矩阵深度值范围 [-1, 1] => [0, 1]
+#include <cstring>
 #include <fstream>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>

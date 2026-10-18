@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cstring>
 #include <fstream>
 #include <glm/glm.hpp>
 #include <iostream>
@@ -75,7 +76,9 @@ void* AlignedAlloc(size_t size, size_t alignment) {
   data = _aligned_malloc(size, alignment);
 #else
   int res = posix_memalign(&data, alignment, size);
-  if (res != 0) data = nullptr;
+  if (res != 0) {
+    data = nullptr;
+  }
 #endif
   return data;
 }

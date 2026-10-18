@@ -7,6 +7,7 @@
 #include <array>
 #include <bit>
 #include <cstddef>
+#include <cstring>
 #include <fstream>
 #include <glm/glm.hpp>
 #include <iostream>
