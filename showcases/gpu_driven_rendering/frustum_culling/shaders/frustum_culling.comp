@@ -15,6 +15,8 @@ struct DrawIndexedIndirectCommand {
 struct DrawInput {
     vec4 bounding_sphere;
     uint index_count;
+    uint first_index;
+    int vertex_offset;
 };
 
 layout(set = 0, binding = 0, std430) readonly buffer DrawInputs {
@@ -29,6 +31,14 @@ layout(set = 0, binding = 2, std140) uniform CullingUniform {
     vec4 frustum_planes[6];
     uvec4 options;
 } culling;
+
+layout(set = 0, binding = 3, std430) buffer DrawCount {
+    uint draw_count;
+};
+
+layout(set = 0, binding = 4, std430) writeonly buffer Visibility {
+    uint visible_objects[];
+};
 
 bool IsVisible(vec4 sphere) {
     if (culling.options.x == 0u) {
@@ -46,15 +56,20 @@ bool IsVisible(vec4 sphere) {
 }
 
 void main() {
-    uint draw_index = gl_GlobalInvocationID.x;
-    if (draw_index >= uint(inputs.length())) {
+    uint object_index = gl_GlobalInvocationID.x;
+    if (object_index >= uint(inputs.length())) {
         return;
     }
 
-    // 一个 invocation 负责一个物体，并完整覆盖全部五个绘制参数。
-    commands[draw_index].index_count = inputs[draw_index].index_count;
-    commands[draw_index].instance_count = IsVisible(inputs[draw_index].bounding_sphere) ? 1u : 0u;
-    commands[draw_index].first_index = 0u;
-    commands[draw_index].vertex_offset = 0;
-    commands[draw_index].first_instance = 0u;
+    DrawInput input_data = inputs[object_index];
+    bool visible = IsVisible(input_data.bounding_sphere);
+    visible_objects[object_index] = visible ? 1u : 0u;
+    if (!visible) {
+        return;
+    }
+
+    // 每个可见物体获得唯一的输出位置，命令数组开头恰好有 draw_count 条有效命令。
+    uint draw_index = atomicAdd(draw_count, 1u);
+    commands[draw_index] = DrawIndexedIndirectCommand(
+        input_data.index_count, 1u, input_data.first_index, input_data.vertex_offset, 0u);
 }

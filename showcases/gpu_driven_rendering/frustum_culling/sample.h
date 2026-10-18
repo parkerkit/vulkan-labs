@@ -4,7 +4,7 @@
 
 #include <array>
 #include <cstdint>
-#include <glm/vec4.hpp>
+#include <optional>
 #include <vector>
 
 #include "framework/aabb.h"
@@ -15,19 +15,10 @@
 #include "framework/orbit_camera.h"
 #include "framework/pipeline.h"
 #include "framework/sample.h"
-#include "framework/shapes.h"
 #include "framework/swapchain.h"
 #include "framework/texture2d.h"
 
 namespace demo {
-struct Drawable {
-  glm::mat4 model_matrix{};
-  fw::Buffer vertex_buffer{};
-  fw::Buffer index_buffer{};
-  glm::vec4 bounding_sphere{};
-  std::uint32_t index_count{};
-};
-
 class Sample final : public fw::ISample {
 public:
   Sample() = default;
@@ -44,6 +35,16 @@ public:
   void OnGui() override;
 
 private:
+  struct ComputeFrame {
+    fw::Buffer indirect_commands{};
+    fw::Buffer draw_count{};
+    fw::Buffer visibility{};
+    fw::Buffer culling_uniform{};
+    fw::Buffer count_readback{};
+    VkDescriptorSet set{};
+    bool has_count_result{false};
+  };
+
   void CreateGeometry();
   void CreateComputeResources();
   void GenerateDrawCommands(const fw::FrameContext& frame);
@@ -52,7 +53,6 @@ private:
   void CreatePipeline(VkFormat color_format);
   void CreateDebugPipeline(VkFormat color_format);
   void ResetAll() noexcept;
-  Drawable CreateDrawable(const fw::Mesh& mesh);
   void Draw(VkCommandBuffer cmd, std::uint32_t frame_index);
   void DrawDebug(const fw::FrameContext& frame);
 
@@ -60,13 +60,14 @@ private:
   fw::FrameScheduler* m_frames{};
   fw::OrbitCamera m_camera{};
   fw::AABB m_scene_bounds{};
-  std::vector<Drawable> m_drawables{};
+  std::uint32_t m_object_count{};
+  std::optional<std::uint32_t> m_last_visible_count{};
+  fw::Buffer m_vertices{};
+  fw::Buffer m_indices{};
   fw::Buffer m_draw_inputs{};
-  std::vector<fw::Buffer> m_culling_uniforms{};
-  std::vector<fw::Buffer> m_indirect_buffers{};
+  std::vector<ComputeFrame> m_compute_frames{};
   fw::DescriptorSetLayout m_compute_set_layout{};
   fw::DescriptorPool m_compute_descriptor_pool{};
-  std::vector<VkDescriptorSet> m_compute_sets{};
   fw::Pipeline m_compute_pipeline{};
   fw::Texture2D m_texture{};
   fw::DescriptorSetLayout m_set_layout{};

@@ -9,22 +9,16 @@ layout(set = 0, binding = 0, std140) uniform CameraUniform {
 struct DrawInput {
     vec4 bounding_sphere;
     uint index_count;
-};
-
-struct DrawIndexedIndirectCommand {
-    uint index_count;
-    uint instance_count;
     uint first_index;
     int vertex_offset;
-    uint first_instance;
 };
 
 layout(set = 1, binding = 0, std430) readonly buffer DrawInputs {
     DrawInput inputs[];
 };
 
-layout(set = 1, binding = 1, std430) readonly buffer IndirectCommands {
-    DrawIndexedIndirectCommand commands[];
+layout(set = 1, binding = 4, std430) readonly buffer Visibility {
+    uint visible_objects[];
 };
 
 layout(push_constant) uniform DebugMode {
@@ -65,7 +59,7 @@ void main() {
         uint object_index = uint(gl_InstanceIndex);
         vec4 sphere = inputs[object_index].bounding_sphere;
         gl_Position = camera.mvp * vec4(sphere.xyz + sphere.w * direction, 1.0);
-        // 直接读取本帧 GPU 写入的命令，颜色与实际绘制状态一致。
-        color = commands[object_index].instance_count != 0u ? vec3(0.15, 0.95, 0.35) : vec3(1.0, 0.2, 0.2);
+        // 压紧后的命令索引与物体索引无关，调试颜色读取按物体索引存储的可见性。
+        color = visible_objects[object_index] != 0u ? vec3(0.15, 0.95, 0.35) : vec3(1.0, 0.2, 0.2);
     }
 }

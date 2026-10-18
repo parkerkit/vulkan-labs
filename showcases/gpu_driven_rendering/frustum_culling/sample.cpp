@@ -20,6 +20,7 @@
 #include <iterator>
 #include <span>
 #include <sstream>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -42,10 +43,13 @@ static_assert(sizeof(CameraUniform) == 192, "CameraUniform must match the GLSL s
 struct alignas(16) DrawInput {
   glm::vec4 bounding_sphere{};
   std::uint32_t index_count{};
-  std::array<std::uint32_t, 3> padding{};
+  std::uint32_t first_index{};
+  std::int32_t vertex_offset{};
 };
 static_assert(sizeof(DrawInput) == 32, "DrawInput must match the GLSL std430 array stride");
-static_assert(offsetof(DrawInput, index_count) == 16, "DrawInput index_count must match GLSL");
+static_assert(offsetof(DrawInput, index_count) == 16);
+static_assert(offsetof(DrawInput, first_index) == 20);
+static_assert(offsetof(DrawInput, vertex_offset) == 24);
 
 struct alignas(16) CullingUniform {
   std::array<glm::vec4, 6> frustum_planes{};
@@ -164,31 +168,67 @@ void Sample::OnInitialize(const fw::SampleContext& context, const fw::SwapchainI
             << "Space: pause/resume | Home: reset camera | R: reset all | Esc: close\n";
 }
 
-Drawable Sample::CreateDrawable(const fw::Mesh& mesh) {
-  // AABB 的外接球保守包围网格，中心与顶点处于相同的场景旋转前坐标系。
-  Drawable drawable{
-    .bounding_sphere = glm::vec4{mesh.bounds.GetCenter(), mesh.bounds.GetBoundingRadius()},
-    .index_count = static_cast<std::uint32_t>(mesh.indices.size()),
-  };
+void Sample::CreateGeometry() {
+  constexpr std::uint32_t grid_size{10};
+  constexpr std::uint32_t object_count{grid_size * grid_size * grid_size};
+  constexpr float start = (grid_size - 1) * -1.0F;
+  if (object_count > m_device->GetInfo().properties.limits.maxDrawIndirectCount) {
+    throw std::runtime_error("Sphere grid exceeds maxDrawIndirectCount for a single indirect batch");
+  }
+  m_object_count = object_count;
 
-  const auto vertex_bytes = std::as_bytes(std::span{mesh.vertices});
-  const auto index_bytes = std::as_bytes(std::span{mesh.indices});
+  const auto sphere = fw::Shapes::Sphere(0.5F, 64, 64, glm::vec3{0.0F});
+  std::vector<fw::Vertex> vertices{};
+  std::vector<std::uint32_t> indices{};
+  std::vector<DrawInput> inputs{};
+  vertices.reserve(sphere.vertices.size() * object_count);
+  indices.reserve(sphere.indices.size() * object_count);
+  inputs.reserve(object_count);
+  for (std::uint32_t x{}; x < grid_size; ++x) {
+    for (std::uint32_t y{}; y < grid_size; ++y) {
+      for (std::uint32_t z{}; z < grid_size; ++z) {
+        const glm::vec3 center{start + static_cast<float>(x) * 2.0F, start + static_cast<float>(y) * 2.0F,
+                               start + static_cast<float>(z) * 2.0F};
+        m_scene_bounds.Merge({sphere.bounds.GetMin() + center, sphere.bounds.GetMax() + center});
+        inputs.push_back({
+          .bounding_sphere = {center, sphere.bounds.GetBoundingRadius()},
+          .index_count = static_cast<std::uint32_t>(sphere.indices.size()),
+          .first_index = static_cast<std::uint32_t>(indices.size()),
+          .vertex_offset = static_cast<std::int32_t>(vertices.size()),
+        });
+        for (auto vertex : sphere.vertices) {
+          vertex.positions += center;
+          vertices.push_back(vertex);
+        }
+        // 保留网格的局部索引，绘制时由 vertexOffset 定位到各自的顶点范围。
+        indices.insert(indices.end(), sphere.indices.begin(), sphere.indices.end());
+      }
+    }
+  }
+
+  const auto input_bytes = std::as_bytes(std::span{inputs});
+  m_draw_inputs = fw::Buffer::Create(
+    *m_device, {input_bytes.size_bytes(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, fw::MemoryUsage::Upload});
+  m_draw_inputs.Write(input_bytes);
+
+  const auto vertex_bytes = std::as_bytes(std::span{vertices});
+  const auto index_bytes = std::as_bytes(std::span{indices});
   auto vertex_staging = fw::Buffer::Create(
     *m_device, {vertex_bytes.size_bytes(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, fw::MemoryUsage::Upload});
   auto index_staging = fw::Buffer::Create(
     *m_device, {index_bytes.size_bytes(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, fw::MemoryUsage::Upload});
   vertex_staging.Write(vertex_bytes);
   index_staging.Write(index_bytes);
-  drawable.vertex_buffer = fw::Buffer::Create(
+  m_vertices = fw::Buffer::Create(
     *m_device, {vertex_bytes.size_bytes(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT});
-  drawable.index_buffer = fw::Buffer::Create(
+  m_indices = fw::Buffer::Create(
     *m_device, {index_bytes.size_bytes(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT});
   // 两次复制合并为一次同步上传，返回后局部暂存缓冲才可安全销毁。
   m_device->SubmitImmediate([&](VkCommandBuffer command_buffer) {
     const VkBufferCopy vertex_copy{.srcOffset = 0, .dstOffset = 0, .size = vertex_bytes.size_bytes()};
     const VkBufferCopy index_copy{.srcOffset = 0, .dstOffset = 0, .size = index_bytes.size_bytes()};
-    vkCmdCopyBuffer(command_buffer, vertex_staging.GetHandle(), drawable.vertex_buffer.GetHandle(), 1, &vertex_copy);
-    vkCmdCopyBuffer(command_buffer, index_staging.GetHandle(), drawable.index_buffer.GetHandle(), 1, &index_copy);
+    vkCmdCopyBuffer(command_buffer, vertex_staging.GetHandle(), m_vertices.GetHandle(), 1, &vertex_copy);
+    vkCmdCopyBuffer(command_buffer, index_staging.GetHandle(), m_indices.GetHandle(), 1, &index_copy);
     // 将复制写入显式关联到后续顶点和索引读取，CPU 等待上传完成不能代替这项 GPU 依赖。
     std::array<VkBufferMemoryBarrier2, 2> barriers{};
     auto& vertex_barrier = barriers.front();
@@ -199,131 +239,70 @@ Drawable Sample::CreateDrawable(const fw::Mesh& mesh) {
     vertex_barrier.dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
     vertex_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     vertex_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    vertex_barrier.buffer = drawable.vertex_buffer.GetHandle();
+    vertex_barrier.buffer = m_vertices.GetHandle();
     vertex_barrier.size = VK_WHOLE_SIZE;
     barriers.back() = vertex_barrier;
     barriers.back().dstStageMask = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
     barriers.back().dstAccessMask = VK_ACCESS_2_INDEX_READ_BIT;
-    barriers.back().buffer = drawable.index_buffer.GetHandle();
+    barriers.back().buffer = m_indices.GetHandle();
     fw::CmdBarrier(command_buffer, barriers, {});
   });
-
-  return drawable;
-}
-
-void Sample::CreateGeometry() {
-  constexpr std::size_t size = 10;
-  constexpr float start = (size - 1) * -1.F;
-  for (std::size_t x = 0; x < size; x++) {
-    for (std::size_t y = 0; y < size; y++) {
-      for (std::size_t z = 0; z < size; z++) {
-        const auto center_x = start + static_cast<float>(x) * 2.F;
-        const auto center_y = start + static_cast<float>(y) * 2.F;
-        const auto center_z = start + static_cast<float>(z) * 2.F;
-        const auto mesh = fw::Shapes::Sphere(0.5F, 64, 64, glm::vec3{center_x, center_y, center_z});
-        m_scene_bounds.Merge(mesh.bounds);
-        m_drawables.emplace_back(CreateDrawable(mesh));
-      }
-    }
-  }
 }
 
 void Sample::CreateComputeResources() {
-  // CPU 提供包围球和索引数量，Compute 判断可见性并生成完整的间接命令。
-  std::vector<DrawInput> inputs{};
-  inputs.reserve(m_drawables.size());
-  for (const auto& drawable : m_drawables) {
-    inputs.push_back({.bounding_sphere = drawable.bounding_sphere, .index_count = drawable.index_count});
-  }
-  const auto input_bytes = std::as_bytes(std::span{inputs});
-  m_draw_inputs = fw::Buffer::Create(
-    *m_device, {input_bytes.size_bytes(), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, fw::MemoryUsage::Upload});
-  // Write 刷新映射内存，首次队列提交使此前的主机写入对 Compute 可见；之后不再修改。
-  m_draw_inputs.Write(input_bytes);
-
-  const std::array<VkDescriptorSetLayoutBinding, 3> bindings{{
-    {.binding = 0,
-     .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-     .descriptorCount = 1,
-     .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT,
-     .pImmutableSamplers = nullptr},
-    {.binding = 1,
-     .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-     .descriptorCount = 1,
-     .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT,
-     .pImmutableSamplers = nullptr},
-    {.binding = 2,
-     .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-     .descriptorCount = 1,
-     .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-     .pImmutableSamplers = nullptr},
+  const std::array<VkDescriptorSetLayoutBinding, 5> bindings{{
+    {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT, nullptr},
+    {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+    {2, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+    {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+    {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT, nullptr},
   }};
   m_compute_set_layout = fw::DescriptorSetLayout::Create(*m_device, bindings);
   const auto frame_count = m_frames->GetFrameCount();
   const std::array<VkDescriptorPoolSize, 2> sizes{{
-    {.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = frame_count * 2},
+    {.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = frame_count * 4},
     {.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = frame_count},
   }};
   m_compute_descriptor_pool = fw::DescriptorPool::Create(*m_device, {frame_count, sizes});
-  const VkDeviceSize command_bytes = m_drawables.size() * sizeof(VkDrawIndexedIndirectCommand);
-  const VkDescriptorBufferInfo input_info{
-    .buffer = m_draw_inputs.GetHandle(),
-    .offset = 0,
-    .range = input_bytes.size_bytes(),
-  };
-  m_indirect_buffers.reserve(frame_count);
-  m_culling_uniforms.reserve(frame_count);
-  m_compute_sets.reserve(frame_count);
-  for (std::uint32_t index{}; index < frame_count; ++index) {
-    // 每个飞行帧独占输出，避免 Compute 覆盖另一帧仍在读取的间接命令。
-    m_indirect_buffers.push_back(fw::Buffer::Create(
-      *m_device, {command_bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT}));
-    m_culling_uniforms.push_back(fw::Buffer::Create(
-      *m_device, {sizeof(CullingUniform), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, fw::MemoryUsage::Upload}));
-    const auto set = m_compute_descriptor_pool.Allocate(m_compute_set_layout.GetHandle());
-    m_compute_sets.push_back(set);
-    const VkDescriptorBufferInfo output_info{
-      .buffer = m_indirect_buffers.back().GetHandle(),
-      .offset = 0,
-      .range = command_bytes,
-    };
-    const VkDescriptorBufferInfo culling_info{
-      .buffer = m_culling_uniforms.back().GetHandle(),
-      .offset = 0,
-      .range = sizeof(CullingUniform),
-    };
-    const std::array<VkWriteDescriptorSet, 3> writes{{
-      {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-       .pNext = nullptr,
-       .dstSet = set,
-       .dstBinding = 0,
-       .dstArrayElement = 0,
-       .descriptorCount = 1,
-       .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-       .pImageInfo = nullptr,
-       .pBufferInfo = &input_info,
-       .pTexelBufferView = nullptr},
-      {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-       .pNext = nullptr,
-       .dstSet = set,
-       .dstBinding = 1,
-       .dstArrayElement = 0,
-       .descriptorCount = 1,
-       .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-       .pImageInfo = nullptr,
-       .pBufferInfo = &output_info,
-       .pTexelBufferView = nullptr},
-      {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-       .pNext = nullptr,
-       .dstSet = set,
-       .dstBinding = 2,
-       .dstArrayElement = 0,
-       .descriptorCount = 1,
-       .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-       .pImageInfo = nullptr,
-       .pBufferInfo = &culling_info,
-       .pTexelBufferView = nullptr},
+
+  const VkDeviceSize command_bytes = m_object_count * sizeof(VkDrawIndexedIndirectCommand);
+  const VkDeviceSize visibility_bytes = m_object_count * sizeof(std::uint32_t);
+  constexpr auto indirect_usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+  m_compute_frames.resize(frame_count);
+  for (auto& resources : m_compute_frames) {
+    resources.indirect_commands = fw::Buffer::Create(*m_device, {command_bytes, indirect_usage});
+    resources.draw_count = fw::Buffer::Create(
+      *m_device,
+      {sizeof(std::uint32_t), indirect_usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT});
+    resources.visibility = fw::Buffer::Create(*m_device, {visibility_bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT});
+    resources.culling_uniform = fw::Buffer::Create(
+      *m_device, {sizeof(CullingUniform), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, fw::MemoryUsage::Upload});
+    resources.count_readback = fw::Buffer::Create(
+      *m_device, {sizeof(std::uint32_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT, fw::MemoryUsage::Readback});
+    resources.set = m_compute_descriptor_pool.Allocate(m_compute_set_layout.GetHandle());
+
+    const std::array<VkDescriptorBufferInfo, bindings.size()> buffer_infos{{
+      {m_draw_inputs.GetHandle(), 0, m_draw_inputs.GetSize()},
+      {resources.indirect_commands.GetHandle(), 0, command_bytes},
+      {resources.culling_uniform.GetHandle(), 0, sizeof(CullingUniform)},
+      {resources.draw_count.GetHandle(), 0, sizeof(std::uint32_t)},
+      {resources.visibility.GetHandle(), 0, visibility_bytes},
     }};
+    std::array<VkWriteDescriptorSet, bindings.size()> writes{};
+    for (std::size_t index{}; index < writes.size(); ++index) {
+      writes[index] = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = nullptr,
+        .dstSet = resources.set,
+        .dstBinding = bindings[index].binding,
+        .dstArrayElement = 0,
+        .descriptorCount = 1,
+        .descriptorType = bindings[index].descriptorType,
+        .pImageInfo = nullptr,
+        .pBufferInfo = &buffer_infos[index],
+        .pTexelBufferView = nullptr,
+      };
+    }
     vkUpdateDescriptorSets(m_device->GetHandle(), static_cast<std::uint32_t>(writes.size()), writes.data(), 0, nullptr);
   }
 
@@ -338,42 +317,82 @@ void Sample::CreateComputeResources() {
 
 void Sample::GenerateDrawCommands(const fw::FrameContext& frame) {
   const auto cmd = frame.command_buffer;
-  const auto set = m_compute_sets.at(frame.frame_index);
+  auto& resources = m_compute_frames.at(frame.frame_index);
+  const auto count_buffer = resources.draw_count.GetHandle();
+  vkCmdFillBuffer(cmd, count_buffer, 0, sizeof(std::uint32_t), 0);
+  const VkBufferMemoryBarrier2 count_reset{
+    .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+    .pNext = nullptr,
+    .srcStageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT,
+    .srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+    .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+    .dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .buffer = count_buffer,
+    .offset = 0,
+    .size = VK_WHOLE_SIZE,
+  };
+  fw::CmdBarrier(cmd, std::span{&count_reset, 1}, {});
+
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_compute_pipeline.GetHandle());
-  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_compute_pipeline.GetLayout(), 0, 1, &set, 0, nullptr);
-  const auto draw_count = static_cast<std::uint32_t>(m_drawables.size());
-  vkCmdDispatch(cmd, (draw_count + k_compute_group_size - 1) / k_compute_group_size, 1, 1);
-  // 主绘制读取间接参数，调试顶点着色器读取同一份结果以显示真实的 GPU 剔除状态。
-  const VkBufferMemoryBarrier2 barrier{
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_compute_pipeline.GetLayout(), 0, 1, &resources.set, 0,
+                          nullptr);
+  vkCmdDispatch(cmd, (m_object_count + k_compute_group_size - 1) / k_compute_group_size, 1, 1);
+
+  const VkBufferMemoryBarrier2 commands_ready{
     .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
     .pNext = nullptr,
     .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
     .srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
-    .dstStageMask = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
-    .dstAccessMask = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT,
+    .dstStageMask = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT,
+    .dstAccessMask = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT,
     .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
     .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-    .buffer = m_indirect_buffers.at(frame.frame_index).GetHandle(),
+    .buffer = resources.indirect_commands.GetHandle(),
     .offset = 0,
     .size = VK_WHOLE_SIZE,
   };
-  fw::CmdBarrier(cmd, std::span{&barrier, 1}, {});
+  // 全部剔除时 Compute 不写计数，Indirect 和回读仍要看到清零操作。
+  auto count_ready = commands_ready;
+  count_ready.srcStageMask |= VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+  count_ready.srcAccessMask |= VK_ACCESS_2_TRANSFER_WRITE_BIT;
+  count_ready.dstStageMask |= VK_PIPELINE_STAGE_2_COPY_BIT;
+  count_ready.dstAccessMask |= VK_ACCESS_2_TRANSFER_READ_BIT;
+  count_ready.buffer = count_buffer;
+
+  auto visibility_ready = commands_ready;
+  visibility_ready.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT;
+  visibility_ready.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+  visibility_ready.buffer = resources.visibility.GetHandle();
+  const std::array barriers{commands_ready, count_ready, visibility_ready};
+  fw::CmdBarrier(cmd, barriers, {});
+
+  // 只为 UI 异步回读 4 字节，绘制始终直接读 GPU 计数缓冲。
+  const auto readback = resources.count_readback.GetHandle();
+  const VkBufferCopy count_copy{.srcOffset = 0, .dstOffset = 0, .size = sizeof(std::uint32_t)};
+  vkCmdCopyBuffer(cmd, count_buffer, readback, 1, &count_copy);
+  auto readback_ready = commands_ready;
+  readback_ready.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+  readback_ready.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+  readback_ready.dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
+  readback_ready.dstAccessMask = VK_ACCESS_2_HOST_READ_BIT;
+  readback_ready.buffer = readback;
+  fw::CmdBarrier(cmd, std::span{&readback_ready, 1}, {});
+  resources.has_count_result = true;
 }
 
 void Sample::Draw(VkCommandBuffer cmd, std::uint32_t frame_index) {
   const auto set = m_sets.at(frame_index);
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline.GetLayout(), 0, 1, &set, 0, nullptr);
-  const auto indirect_buffer = m_indirect_buffers.at(frame_index).GetHandle();
-  VkDeviceSize indirect_offset{};
-  for (const auto& drawable : m_drawables) {
-    const auto vertex_buffer = drawable.vertex_buffer.GetHandle();
-    const VkDeviceSize offset{};
-    vkCmdBindVertexBuffers(cmd, 0, 1, &vertex_buffer, &offset);
-    vkCmdBindIndexBuffer(cmd, drawable.index_buffer.GetHandle(), 0, VK_INDEX_TYPE_UINT32);
-    // 保留 basic 的独立几何绑定，每个物体读取 Compute 生成的对应命令。
-    vkCmdDrawIndexedIndirect(cmd, indirect_buffer, indirect_offset, 1, sizeof(VkDrawIndexedIndirectCommand));
-    indirect_offset += sizeof(VkDrawIndexedIndirectCommand);
-  }
+  const auto vertex_buffer = m_vertices.GetHandle();
+  const VkDeviceSize offset{};
+  vkCmdBindVertexBuffers(cmd, 0, 1, &vertex_buffer, &offset);
+  vkCmdBindIndexBuffer(cmd, m_indices.GetHandle(), 0, VK_INDEX_TYPE_UINT32);
+
+  const auto& resources = m_compute_frames.at(frame_index);
+  vkCmdDrawIndexedIndirectCount(cmd, resources.indirect_commands.GetHandle(), 0, resources.draw_count.GetHandle(), 0,
+                                m_object_count, sizeof(VkDrawIndexedIndirectCommand));
 }
 
 void Sample::CreateDescriptors() {
@@ -532,7 +551,7 @@ void Sample::DrawDebug(const fw::FrameContext& frame) {
   }
   const auto cmd = frame.command_buffer;
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_debug_pipeline.GetHandle());
-  const std::array sets{m_sets.at(frame.frame_index), m_compute_sets.at(frame.frame_index)};
+  const std::array sets{m_sets.at(frame.frame_index), m_compute_frames.at(frame.frame_index).set};
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_debug_pipeline.GetLayout(), 0,
                           static_cast<std::uint32_t>(sets.size()), sets.data(), 0, nullptr);
   if (m_show_frustum) {
@@ -543,7 +562,7 @@ void Sample::DrawDebug(const fw::FrameContext& frame) {
   if (m_show_bounds) {
     const std::uint32_t mode{1};
     vkCmdPushConstants(cmd, m_debug_pipeline.GetLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mode), &mode);
-    vkCmdDraw(cmd, k_sphere_line_vertices, static_cast<std::uint32_t>(m_drawables.size()), 0, 0);
+    vkCmdDraw(cmd, k_sphere_line_vertices, m_object_count, 0, 0);
   }
 }
 
@@ -563,6 +582,12 @@ void Sample::ResetAll() noexcept {
 void Sample::OnUpdate(const fw::FrameContext& frame, const fw::InputState& input, float delta_seconds) {
   // 此帧槽位的 fence 已完成，在复用 Query Pool 前读取其上一次提交的结果。
   m_gpu_timer.BeginFrame(frame);
+  auto& resources = m_compute_frames.at(frame.frame_index);
+  if (resources.has_count_result) {
+    std::uint32_t count{};
+    resources.count_readback.Read(std::as_writable_bytes(std::span{&count, 1}));
+    m_last_visible_count = count;
+  }
   if (input.IsPressed(fw::Key::Space)) {
     m_enable_rotation = !m_enable_rotation;
   }
@@ -613,7 +638,7 @@ void Sample::OnUpdate(const fw::FrameContext& frame, const fw::InputState& input
     plane /= glm::length(glm::vec3{plane});
   }
   culling.options.front() = m_enable_culling ? 1U : 0U;
-  m_culling_uniforms.at(frame.frame_index).Write(std::as_bytes(std::span{&culling, 1}));
+  resources.culling_uniform.Write(std::as_bytes(std::span{&culling, 1}));
 }
 
 void Sample::OnRender(const fw::FrameContext& frame) {
@@ -645,7 +670,12 @@ void Sample::OnGui() {
   ImGui::SetNextWindowPos(ImVec2{16.0F, 16.0F}, ImGuiCond_FirstUseEver);
   if (ImGui::Begin("Frustum Culling", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
     ImGui::TextUnformatted(std::data(m_device->GetInfo().properties.deviceName));
-    ImGui::TextUnformatted(std::format("Objects: {} | Draw calls: {}", m_drawables.size(), m_drawables.size()).c_str());
+    ImGui::TextUnformatted(std::format("Objects: {} | Indirect submissions: 1", m_object_count).c_str());
+    if (m_last_visible_count) {
+      ImGui::TextUnformatted(std::format("Visible (completed frame): {}", *m_last_visible_count).c_str());
+    } else {
+      ImGui::TextUnformatted("Visible (completed frame): --");
+    }
     std::ostringstream stats{};
     stats << std::fixed << std::setprecision(1) << ImGui::GetIO().Framerate << " FPS | " << m_extent.width << " x "
           << m_extent.height;
