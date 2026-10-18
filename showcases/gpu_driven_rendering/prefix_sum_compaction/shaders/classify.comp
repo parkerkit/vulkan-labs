@@ -1,0 +1,102 @@
+#version 450
+
+#ifdef PREFIX_SUM_COMPACTION
+#extension GL_GOOGLE_include_directive : require
+#include "scan_workspace.glsl"
+#include "exclusive_scan.glsl"
+#endif
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+// 与 VkDrawIndexedIndirectCommand 的字段顺序、类型和 20 字节步长一致。
+struct DrawIndexedIndirectCommand {
+    uint index_count;
+    uint instance_count;
+    uint first_index;
+    int vertex_offset;
+    uint first_instance;
+};
+
+// std430 的结构体数组步长为 32 字节，与 C++ DrawInput 一致。
+struct DrawInput {
+    vec4 bounding_sphere;
+    uint index_count;
+    uint first_index;
+    int vertex_offset;
+};
+
+layout(set = 0, binding = 0, std430) readonly buffer DrawInputs {
+    DrawInput inputs[];
+};
+
+layout(set = 0, binding = 1, std430) writeonly buffer IndirectCommands {
+    DrawIndexedIndirectCommand commands[];
+};
+
+layout(set = 0, binding = 2, std140) uniform CullingUniform {
+    vec4 frustum_planes[6];
+    uvec4 options;
+} culling;
+
+layout(set = 0, binding = 3, std430) buffer DrawCount {
+    uint draw_count;
+};
+
+layout(set = 0, binding = 4, std430) writeonly buffer Visibility {
+    uint visible_objects[];
+};
+
+bool IsVisible(uint object_index, vec4 sphere) {
+    if (culling.options.w != 0u) {
+        return (object_index * 37u) % 100u < culling.options.z;
+    }
+    if (culling.options.x == 0u) {
+        return true;
+    }
+
+    for (int plane_index = 0; plane_index < 6; ++plane_index) {
+        // 平面法线已归一化；只有整个包围球位于某一平面外侧时才剔除。
+        float distance_to_plane = dot(culling.frustum_planes[plane_index], vec4(sphere.xyz, 1.0));
+        if (distance_to_plane < -sphere.w) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void main() {
+    uint object_index = gl_GlobalInvocationID.x;
+    uint object_count = culling.options.y;
+#ifdef PREFIX_SUM_COMPACTION
+    // 尾组补零，所有调用都必须参与工作组内的 barrier。
+    uint visible = 0u;
+    if (object_index < object_count) {
+        visible = IsVisible(object_index, inputs[object_index].bounding_sphere) ? 1u : 0u;
+        visible_objects[object_index] = visible;
+    }
+    uint block_total;
+    uint local_offset = ExclusiveScan(visible, block_total);
+    if (object_index < object_count) {
+        visible_objects[LocalOffsetIndex(object_count, object_index)] = local_offset;
+    }
+    if (gl_LocalInvocationIndex == 0u) {
+        visible_objects[BlockTotalIndex(object_count, gl_WorkGroupID.x)] = block_total;
+    }
+#else
+    if (object_index >= object_count) {
+        return;
+    }
+
+    DrawInput input_data = inputs[object_index];
+    bool visible = IsVisible(object_index, input_data.bounding_sphere);
+    visible_objects[object_index] = visible ? 1u : 0u;
+    if (!visible) {
+        return;
+    }
+
+    // 每个可见物体获得唯一的输出位置，命令数组开头恰好有 draw_count 条有效命令。
+    uint draw_index = atomicAdd(draw_count, 1u);
+    commands[draw_index] = DrawIndexedIndirectCommand(
+        input_data.index_count, 1u, input_data.first_index, input_data.vertex_offset, 0u);
+#endif
+}

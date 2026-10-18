@@ -1,0 +1,54 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 64) in;
+
+#include "scan_workspace.glsl"
+
+struct DrawInput {
+    vec4 bounding_sphere;
+    uint index_count;
+    uint first_index;
+    int vertex_offset;
+};
+
+struct DrawIndexedIndirectCommand {
+    uint index_count;
+    uint instance_count;
+    uint first_index;
+    int vertex_offset;
+    uint first_instance;
+};
+
+layout(set = 0, binding = 0, std430) readonly buffer DrawInputs {
+    DrawInput inputs[];
+};
+
+layout(set = 0, binding = 1, std430) writeonly buffer IndirectCommands {
+    DrawIndexedIndirectCommand commands[];
+};
+
+layout(set = 0, binding = 2, std140) uniform CullingUniform {
+    vec4 frustum_planes[6];
+    uvec4 options;
+} culling;
+
+layout(set = 0, binding = 4, std430) readonly buffer Visibility {
+    uint workspace[];
+};
+
+void main() {
+    uint object_index = gl_GlobalInvocationID.x;
+    uint object_count = culling.options.y;
+    if (object_index >= object_count) {
+        return;
+    }
+    if (workspace[object_index] == 0u) {
+        return;
+    }
+    uint block_offset = workspace[BlockOffsetIndex(object_count, gl_WorkGroupID.x)];
+    uint local_offset = workspace[LocalOffsetIndex(object_count, object_index)];
+    DrawInput input_data = inputs[object_index];
+    commands[block_offset + local_offset] = DrawIndexedIndirectCommand(
+        input_data.index_count, 1u, input_data.first_index, input_data.vertex_offset, 0u);
+}
