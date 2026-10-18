@@ -26,6 +26,7 @@ struct DeviceDesc {
   std::vector<std::string> required_extensions{};  ///< 必需设备扩展；框架自动加入交换链扩展。
   bool enable_draw_indirect_count{false};
   bool enable_draw_indirect_first_instance{false};
+  bool enable_sampled_image_non_uniform_indexing{false};
 };
 
 struct DeviceInfo {

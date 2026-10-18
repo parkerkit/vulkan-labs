@@ -220,6 +220,8 @@ void Device::SelectPhysicalDevice(const DeviceDesc& desc) {
         (desc.enable_multi_draw_indirect && features.features.multiDrawIndirect != VK_TRUE) ||
         (desc.enable_draw_indirect_count && features12.drawIndirectCount != VK_TRUE) ||
         (desc.enable_draw_indirect_first_instance && features.features.drawIndirectFirstInstance != VK_TRUE) ||
+        (desc.enable_sampled_image_non_uniform_indexing &&
+         features12.shaderSampledImageArrayNonUniformIndexing != VK_TRUE) ||
         !HasExtensions(candidate, desc)) {
       continue;
     }
@@ -274,9 +276,12 @@ void Device::CreateLogicalDevice(const DeviceDesc& desc) {
   VkPhysicalDeviceVulkan12Features features12{};
   features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
   features12.drawIndirectCount = desc.enable_draw_indirect_count ? VK_TRUE : VK_FALSE;
+  features12.shaderSampledImageArrayNonUniformIndexing =
+    desc.enable_sampled_image_non_uniform_indexing ? VK_TRUE : VK_FALSE;
+  const bool use_features12 = desc.enable_draw_indirect_count || desc.enable_sampled_image_non_uniform_indexing;
   VkPhysicalDeviceVulkan13Features features13{
     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
-    .pNext = desc.enable_draw_indirect_count ? &features12 : nullptr,
+    .pNext = use_features12 ? &features12 : nullptr,
     .robustImageAccess = {},
     .inlineUniformBlock = {},
     .descriptorBindingInlineUniformBlockUpdateAfterBind = {},
