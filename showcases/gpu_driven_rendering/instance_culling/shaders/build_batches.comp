@@ -1,0 +1,23 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 1) in;
+
+#include "lod_resources.glsl"
+
+void main() {
+    uint object_count = uint(spheres.length());
+    uint draw_count = 0u;
+    for (uint lod = 0u; lod < uint(culling.meshes.length()); ++lod) {
+        uint instance_count = stats.lod_counts[lod];
+        if (instance_count == 0u) {
+            continue;
+        }
+
+        uvec4 mesh = culling.meshes[lod];
+        commands[draw_count] = DrawIndexedIndirectCommand(
+            mesh.x, instance_count, mesh.y, int(mesh.z), lod * object_count);
+        ++draw_count;
+    }
+    stats.draw_count = draw_count;
+}

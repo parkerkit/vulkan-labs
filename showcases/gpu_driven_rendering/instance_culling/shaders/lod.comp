@@ -1,0 +1,56 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 64) in;
+
+#include "lod_resources.glsl"
+
+bool IsVisible(vec4 sphere) {
+    if (culling.options.x == 0u) {
+        return true;
+    }
+    for (int plane_index = 0; plane_index < 6; ++plane_index) {
+        if (dot(culling.frustum_planes[plane_index], vec4(sphere.xyz, 1.0)) < -sphere.w) {
+            return false;
+        }
+    }
+    return true;
+}
+
+uint SelectLod(vec4 sphere) {
+    float depth = dot(culling.view_depth, vec4(sphere.xyz, 1.0));
+    if (culling.options.y != 0u || depth <= sphere.w) {
+        return 0u;
+    }
+    // 以球心视空间深度近似投影直径。视口高度乘投影系数，将结果换算为像素。
+    float diameter_pixels = sphere.w * culling.lod_parameters.x / depth;
+    if (diameter_pixels >= culling.lod_parameters.y) {
+        return 0u;
+    }
+    return diameter_pixels >= culling.lod_parameters.z ? 1u : 2u;
+}
+
+void main() {
+    uint object_index = gl_GlobalInvocationID.x;
+    if (object_index >= uint(spheres.length())) {
+        return;
+    }
+    vec4 sphere = spheres[object_index];
+    if (!IsVisible(sphere)) {
+        return;
+    }
+
+    uint lod = SelectLod(sphere);
+#ifdef BATCH_INSTANCES
+    // 每个 LOD 拥有 object_count 个槽位，组内索引由原子计数分配。
+    uint object_count = uint(spheres.length());
+    uint instance_index = atomicAdd(stats.lod_counts[lod], 1u);
+    object_indices[lod * object_count + instance_index] = object_index;
+#else
+    atomicAdd(stats.lod_counts[lod], 1u);
+    uint draw_index = atomicAdd(stats.draw_count, 1u);
+    object_indices[draw_index] = object_index;
+    uvec4 mesh = culling.meshes[lod];
+    commands[draw_index] = DrawIndexedIndirectCommand(mesh.x, 1u, mesh.y, int(mesh.z), draw_index);
+#endif
+}
