@@ -1,1 +1,2 @@
 add_subdirectory(cpu_driven_rendering)
+add_subdirectory(gpu_driven_rendering)
