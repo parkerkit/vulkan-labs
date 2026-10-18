@@ -219,6 +219,7 @@ void Device::SelectPhysicalDevice(const DeviceDesc& desc) {
         (desc.enable_sampler_anisotropy && features.features.samplerAnisotropy != VK_TRUE) ||
         (desc.enable_multi_draw_indirect && features.features.multiDrawIndirect != VK_TRUE) ||
         (desc.enable_draw_indirect_count && features12.drawIndirectCount != VK_TRUE) ||
+        (desc.enable_draw_indirect_first_instance && features.features.drawIndirectFirstInstance != VK_TRUE) ||
         !HasExtensions(candidate, desc)) {
       continue;
     }
@@ -299,6 +300,7 @@ void Device::CreateLogicalDevice(const DeviceDesc& desc) {
   };
   features.features.samplerAnisotropy = desc.enable_sampler_anisotropy ? VK_TRUE : VK_FALSE;
   features.features.multiDrawIndirect = desc.enable_multi_draw_indirect ? VK_TRUE : VK_FALSE;
+  features.features.drawIndirectFirstInstance = desc.enable_draw_indirect_first_instance ? VK_TRUE : VK_FALSE;
   // 支持的特性不会自动启用，只向逻辑设备申请框架和调用者实际需要的特性。
   const auto extensions = GetDeviceExtensions(desc);
   VkDeviceCreateInfo info{
