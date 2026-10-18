@@ -34,8 +34,10 @@ namespace demo {
 namespace {
 struct alignas(16) CameraUniform {
   glm::mat4 model_view_projection{1.0F};
+  glm::mat4 view_projection{1.0F};
+  glm::mat4 inverse_culling_view_projection{1.0F};
 };
-static_assert(sizeof(CameraUniform) == 64, "CameraUniform must match the GLSL std140 block");
+static_assert(sizeof(CameraUniform) == 192, "CameraUniform must match the GLSL std140 block");
 
 struct alignas(16) DrawInput {
   glm::vec4 bounding_sphere{};
@@ -55,6 +57,28 @@ static_assert(offsetof(CullingUniform, options) == 96, "CullingUniform options m
 static_assert(sizeof(VkDrawIndexedIndirectCommand) == 20, "Indirect command must match the GLSL std430 struct");
 // 与 frustum_culling.comp 的 local_size_x 保持一致。
 constexpr std::uint32_t k_compute_group_size{64};
+constexpr std::uint32_t k_compute_begin{0};
+constexpr std::uint32_t k_compute_end{1};
+constexpr std::uint32_t k_draw_end{2};
+constexpr std::uint32_t k_debug_end{3};
+constexpr std::uint32_t k_timestamp_count{4};
+// 三个大圆，每个圆有 32 条线段，与 frustum_debug.vert 保持一致。
+constexpr std::uint32_t k_sphere_line_vertices{3 * 32 * 2};
+
+std::array<glm::vec3, 8> GetFrustumCorners(const glm::mat4& inverse_view_projection) {
+  std::array<glm::vec3, 8> corners{};
+  for (std::size_t index{}; index < corners.size(); ++index) {
+    const glm::vec4 clip{
+      (index & 1U) != 0 ? 1.0F : -1.0F,
+      (index & 2U) != 0 ? 1.0F : -1.0F,
+      (index & 4U) != 0 ? 1.0F : 0.0F,
+      1.0F,
+    };
+    const auto world = inverse_view_projection * clip;
+    corners.at(index) = glm::vec3{world} / world.w;
+  }
+  return corners;
+}
 
 void BeginAttachments(const fw::FrameContext& frame, const fw::Image& depth, const std::array<float, 4>& clear_color) {
   // 深度图按帧槽位独占且每帧清空，槽位 fence 已完成，可丢弃其上次内容。
@@ -126,6 +150,7 @@ void BeginAttachments(const fw::FrameContext& frame, const fw::Image& depth, con
 void Sample::OnInitialize(const fw::SampleContext& context, const fw::SwapchainInfo& swapchain) {
   m_device = &context.device;
   m_frames = &context.frames;
+  m_gpu_timer = fw::GpuTimer::Create(*m_device, m_frames->GetFrameCount(), k_timestamp_count);
   m_depth_format = fw::Image::FindDepthFormat(*m_device);
   CreateGeometry();
   CreateComputeResources();
@@ -220,12 +245,12 @@ void Sample::CreateComputeResources() {
     {.binding = 0,
      .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
      .descriptorCount = 1,
-     .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+     .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT,
      .pImmutableSamplers = nullptr},
     {.binding = 1,
      .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
      .descriptorCount = 1,
-     .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+     .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT,
      .pImmutableSamplers = nullptr},
     {.binding = 2,
      .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -318,14 +343,14 @@ void Sample::GenerateDrawCommands(const fw::FrameContext& frame) {
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_compute_pipeline.GetLayout(), 0, 1, &set, 0, nullptr);
   const auto draw_count = static_cast<std::uint32_t>(m_drawables.size());
   vkCmdDispatch(cmd, (draw_count + k_compute_group_size - 1) / k_compute_group_size, 1, 1);
-  // Compute 的存储写入必须对后续 DRAW_INDIRECT 阶段的参数读取可见。
+  // 主绘制读取间接参数，调试顶点着色器读取同一份结果以显示真实的 GPU 剔除状态。
   const VkBufferMemoryBarrier2 barrier{
     .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
     .pNext = nullptr,
     .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
     .srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
-    .dstStageMask = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT,
-    .dstAccessMask = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT,
+    .dstStageMask = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+    .dstAccessMask = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT,
     .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
     .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
     .buffer = m_indirect_buffers.at(frame.frame_index).GetHandle(),
@@ -472,6 +497,53 @@ void Sample::OnResize(const fw::SwapchainInfo& swapchain) {
   // 视口和裁剪矩形是动态状态；只有颜色格式变化才影响管线的附件兼容性。
   if (m_pipeline.GetHandle() == VK_NULL_HANDLE || m_color_format != swapchain.format) {
     CreatePipeline(swapchain.format);
+    CreateDebugPipeline(swapchain.format);
+  }
+}
+
+void Sample::CreateDebugPipeline(VkFormat color_format) {
+  const auto shader_directory = std::filesystem::path{PROJECT_SHADER_DIR};
+  auto vertex = fw::ShaderModule::Load(*m_device, shader_directory / "gpu_driven_rendering/frustum_debug_vert.spv");
+  auto fragment = fw::ShaderModule::Load(*m_device, shader_directory / "gpu_driven_rendering/frustum_debug_frag.spv");
+  const std::array layouts{m_set_layout.GetHandle(), m_compute_set_layout.GetHandle()};
+  const VkPushConstantRange mode_range{
+    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+    .offset = 0,
+    .size = sizeof(std::uint32_t),
+  };
+  fw::GraphicsPipelineDesc desc{};
+  desc.vertex_shader = vertex.GetHandle();
+  desc.fragment_shader = fragment.GetHandle();
+  desc.layout.set_layouts = layouts;
+  desc.layout.push_constants = std::span{&mode_range, 1};
+  desc.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+  desc.cull_mode = VK_CULL_MODE_NONE;
+  desc.color_formats = std::span{&color_format, 1};
+  desc.depth_format = m_depth_format;
+  // 线框作为覆盖层独立绘制，剔除物体的包围球也始终可见。
+  desc.depth_compare = VK_COMPARE_OP_ALWAYS;
+  desc.enable_depth_write = false;
+  m_debug_pipeline = fw::Pipeline::CreateGraphics(*m_device, desc);
+}
+
+void Sample::DrawDebug(const fw::FrameContext& frame) {
+  if (!m_show_frustum && !m_show_bounds) {
+    return;
+  }
+  const auto cmd = frame.command_buffer;
+  vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_debug_pipeline.GetHandle());
+  const std::array sets{m_sets.at(frame.frame_index), m_compute_sets.at(frame.frame_index)};
+  vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_debug_pipeline.GetLayout(), 0,
+                          static_cast<std::uint32_t>(sets.size()), sets.data(), 0, nullptr);
+  if (m_show_frustum) {
+    const std::uint32_t mode{0};
+    vkCmdPushConstants(cmd, m_debug_pipeline.GetLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mode), &mode);
+    vkCmdDraw(cmd, 24, 1, 0, 0);
+  }
+  if (m_show_bounds) {
+    const std::uint32_t mode{1};
+    vkCmdPushConstants(cmd, m_debug_pipeline.GetLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mode), &mode);
+    vkCmdDraw(cmd, k_sphere_line_vertices, static_cast<std::uint32_t>(m_drawables.size()), 0, 0);
   }
 }
 
@@ -481,10 +553,16 @@ void Sample::ResetAll() noexcept {
   m_rotation_speed = 0.5F;
   m_enable_rotation = true;
   m_enable_culling = true;
+  m_freeze_frustum = false;
+  m_has_culling_frustum = false;
+  m_show_frustum = false;
+  m_show_bounds = false;
   m_clear_color = {0.025F, 0.035F, 0.06F, 1.0F};
 }
 
 void Sample::OnUpdate(const fw::FrameContext& frame, const fw::InputState& input, float delta_seconds) {
+  // 此帧槽位的 fence 已完成，在复用 Query Pool 前读取其上一次提交的结果。
+  m_gpu_timer.BeginFrame(frame);
   if (input.IsPressed(fw::Key::Space)) {
     m_enable_rotation = !m_enable_rotation;
   }
@@ -504,12 +582,24 @@ void Sample::OnUpdate(const fw::FrameContext& frame, const fw::InputState& input
   // 当前模型只进行刚性旋转，世界空间球心随模型变换，包围球半径保持不变。
   const auto scene_center = glm::vec3{model * glm::vec4{m_scene_bounds.GetCenter(), 1.0F}};
   m_camera.SetSceneBoundingSphere(scene_center, m_scene_bounds.GetBoundingRadius());
-  uniform.model_view_projection = m_camera.GetProjectionMatrix(aspect) * m_camera.GetViewMatrix() * model;
+  const auto view = m_camera.GetViewMatrix();
+  uniform.view_projection = m_camera.GetProjectionMatrix(aspect) * view;
+  if (!m_freeze_frustum || !m_has_culling_frustum) {
+    m_culling_view_projection = uniform.view_projection;
+    m_has_culling_frustum = true;
+  }
+  uniform.inverse_culling_view_projection = glm::inverse(m_culling_view_projection);
+  if (m_freeze_frustum && m_show_frustum) {
+    // 观察范围纳入真实冻结视锥的八个角点；冻结的 GPU 剔除矩阵与相机位姿均保持不变。
+    const auto corners = GetFrustumCorners(uniform.inverse_culling_view_projection);
+    uniform.view_projection = m_camera.GetProjectionMatrix(aspect, corners) * view;
+  }
+  uniform.model_view_projection = uniform.view_projection * model;
   // 按帧槽位而非交换链图像选择缓冲，该槽位的 fence 已在更新回调前等待完成。
   m_uniforms.at(frame.frame_index).Write(std::as_bytes(std::span{&uniform, 1}));
 
-  // 从实际绘制的 MVP 提取平面，使包围球测试自动包含场景旋转和投影的 Y 翻转。
-  const auto rows = glm::transpose(uniform.model_view_projection);
+  // 冻结相机视锥后，场景模型变换仍实时更新；球体与剔除平面保持在同一坐标系。
+  const auto rows = glm::transpose(m_culling_view_projection * model);
   CullingUniform culling{};
   culling.frustum_planes = {
     rows[3] + rows[0],  // x >= -w
@@ -527,8 +617,10 @@ void Sample::OnUpdate(const fw::FrameContext& frame, const fw::InputState& input
 }
 
 void Sample::OnRender(const fw::FrameContext& frame) {
+  m_gpu_timer.WriteTimestamp(frame, k_compute_begin);
   // Dispatch 与 Compute -> Indirect 屏障都位于动态渲染作用域之外。
   GenerateDrawCommands(frame);
+  m_gpu_timer.WriteTimestamp(frame, k_compute_end);
   BeginAttachments(frame, m_depth_images.at(frame.frame_index), m_clear_color);
   vkCmdBindPipeline(frame.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline.GetHandle());
   const VkViewport viewport{
@@ -543,6 +635,9 @@ void Sample::OnRender(const fw::FrameContext& frame) {
   vkCmdSetViewport(frame.command_buffer, 0, 1, &viewport);
   vkCmdSetScissor(frame.command_buffer, 0, 1, &scissor);
   Draw(frame.command_buffer, frame.frame_index);
+  m_gpu_timer.WriteTimestamp(frame, k_draw_end);
+  DrawDebug(frame);
+  m_gpu_timer.WriteTimestamp(frame, k_debug_end);
   vkCmdEndRendering(frame.command_buffer);
 }
 
@@ -555,8 +650,32 @@ void Sample::OnGui() {
     stats << std::fixed << std::setprecision(1) << ImGui::GetIO().Framerate << " FPS | " << m_extent.width << " x "
           << m_extent.height;
     ImGui::TextUnformatted(stats.str().c_str());
+    if (m_gpu_timer.IsSupported()) {
+      const auto show_timing = [&](const char* label, std::uint32_t begin, std::uint32_t end) {
+        const auto milliseconds = m_gpu_timer.GetElapsedMilliseconds(begin, end);
+        if (milliseconds) {
+          ImGui::TextUnformatted(std::format("{}: {:.3f} ms", label, *milliseconds).c_str());
+        } else {
+          ImGui::TextUnformatted(std::format("{}: --", label).c_str());
+        }
+      };
+      show_timing("GPU Compute", k_compute_begin, k_compute_end);
+      show_timing("GPU Scene", k_compute_end, k_draw_end);
+      show_timing("GPU Debug", k_draw_end, k_debug_end);
+      ImGui::TextUnformatted("GPU timings: completed frames, excluding ImGui");
+    } else {
+      ImGui::TextUnformatted("GPU timestamps unavailable on this queue");
+    }
     ImGui::Separator();
     ImGui::Checkbox("Frustum culling", &m_enable_culling);
+    ImGui::Checkbox("Freeze culling frustum", &m_freeze_frustum);
+    ImGui::Checkbox("Show culling frustum", &m_show_frustum);
+    ImGui::Checkbox("Show bounding spheres", &m_show_bounds);
+    if (m_show_frustum || m_show_bounds) {
+      ImGui::TextUnformatted("Yellow: frustum | Green: drawn | Red: culled");
+      ImGui::TextUnformatted("Freeze the frustum, then move the camera to inspect");
+      ImGui::TextUnformatted("Disable debug overlays when comparing performance");
+    }
     ImGui::Checkbox("Auto rotate", &m_enable_rotation);
     ImGui::SliderFloat("Speed (rad/s)", &m_rotation_speed, 0.0F, 2.0F);
     ImGui::SliderAngle("Angle", &m_rotation, -180.0F, 180.0F);

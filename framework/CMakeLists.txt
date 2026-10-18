@@ -15,6 +15,7 @@ add_library("${target_name}" STATIC
     include/framework/synchronization.h
     include/framework/swapchain.h
     include/framework/frame_context.h
+    include/framework/gpu_timer.h
     include/framework/frame_scheduler.h
     include/framework/sample.h
     include/framework/application.h
@@ -36,6 +37,7 @@ add_library("${target_name}" STATIC
     src/synchronization.cpp
     src/swapchain.cpp
     src/frame_scheduler.cpp
+    src/gpu_timer.cpp
     src/application.cpp
     src/shapes.cpp
     src/aabb.cpp

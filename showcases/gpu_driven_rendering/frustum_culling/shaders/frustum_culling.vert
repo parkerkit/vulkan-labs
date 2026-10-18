@@ -6,6 +6,8 @@ layout(location = 2) in vec2 in_texcoord;
 
 layout(set = 0, binding = 0, std140) uniform CameraUniform {
     mat4 mvp;
+    mat4 view_projection;
+    mat4 inverse_culling_view_projection;
 } camera;
 
 layout(location = 0) out vec2 texcoord;

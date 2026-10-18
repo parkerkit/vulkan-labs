@@ -99,6 +99,7 @@ ImGui 捕获鼠标或键盘时，相应输入会从传给示例的快照中清�
 该方法不改变相机位姿和交互使用的取景尺度；缩放或其他模型变换须由调用者计入球心和半径。
 
 `GetProjectionMatrix(aspect, additional_clip_points)` 可额外纳入调试几何的世界空间点，仅扩展近远裁剪范围。
+`frustum_culling` 在冻结并显示剔除视锥时纳入真实八角点，完整保留冻结矩阵及线框几何。
 此操作不改变观察相机位姿或横纵视野，线框仍须位于观察相机的屏幕范围内。
 
 ## 应用与回调
@@ -150,6 +151,31 @@ Acquire semaphore 按飞行帧分配，Present wait semaphore 按交换链图像
 `Buffer::Write()` 检查范围并 Flush，`Read()` 在读取前 Invalidate；CPU/GPU 访问顺序仍由调用者负责。
 `Image` 不隐式转换布局，使用 `CmdBarrier` 显式指定 stage、access 与子资源范围。
 `SubmitImmediate()` 将初始化命令录制到一次提交中，并等待该提交的 fence；staging 资源必须存活到调用返回。
+
+## GPU 耗时统计
+
+`fw::GpuTimer` 为图形队列提供可复用的 Timestamp Query，按飞行帧分配 Query Pool。
+示例决定时间戳的位置和界面显示，计时器负责读取结果并根据设备的 `timestampPeriod` 换算成毫秒。
+
+```cpp
+// 初始化时创建；两个时间戳构成一个测量区间。
+timer = fw::GpuTimer::Create(context.device, context.frames.GetFrameCount(), 2);
+
+// OnUpdate：帧槽位 fence 已完成，读取上次结果并录制本帧 query reset。
+timer.BeginFrame(frame);
+const auto previous_ms = timer.GetElapsedMilliseconds(0, 1);
+
+// OnRender：在需要测量的 GPU 命令前后写入时间戳。
+timer.WriteTimestamp(frame, 0);
+// ... 录制绘制或计算命令 ...
+timer.WriteTimestamp(frame, 1);
+```
+
+`BeginFrame` 必须在渲染作用域之外调用，每个索引每帧最多写入一次。
+默认时间戳阶段为 `ALL_COMMANDS`，连续时间戳划分各阶段的近似 GPU 耗时；这些结果不包含 CPU 耗时。
+结果来自帧槽位的上一次提交，读取不使用 `WAIT_BIT`，也不额外调用 Queue/Device Idle。
+不支持时间戳的设备或队列会禁用计时器，`IsSupported()` 返回 `false`，耗时结果为 `nullopt`。
+销毁计时器前须保证 GPU 已完成使用，遵循其他框架资源相同的寿命规则。
 
 ## ImGui 与异常边界
 
