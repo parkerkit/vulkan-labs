@@ -1,0 +1,34 @@
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+// 与 VkDrawIndexedIndirectCommand 的字段顺序、类型和 20 字节步长一致。
+struct DrawIndexedIndirectCommand {
+    uint index_count;
+    uint instance_count;
+    uint first_index;
+    int vertex_offset;
+    uint first_instance;
+};
+
+layout(set = 0, binding = 0, std430) readonly buffer DrawIndexCounts {
+    uint index_counts[];
+};
+
+layout(set = 0, binding = 1, std430) writeonly buffer IndirectCommands {
+    DrawIndexedIndirectCommand commands[];
+};
+
+void main() {
+    uint draw_index = gl_GlobalInvocationID.x;
+    if (draw_index >= uint(index_counts.length())) {
+        return;
+    }
+
+    // 一个 invocation 负责一个物体，并完整覆盖全部五个绘制参数。
+    commands[draw_index].index_count = index_counts[draw_index];
+    commands[draw_index].instance_count = 1u;
+    commands[draw_index].first_index = 0u;
+    commands[draw_index].vertex_offset = 0;
+    commands[draw_index].first_instance = 0u;
+}

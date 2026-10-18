@@ -1,2 +1,3 @@
 add_subdirectory(draw_indirect)
 add_subdirectory(multi_draw_indirect)
+add_subdirectory(compute_draw_indirect)
