@@ -23,7 +23,6 @@
 
 namespace demo {
 namespace {
-constexpr auto k_shader_directory = "gpu_driven_rendering/gpu_lod";
 constexpr std::uint32_t k_compute_group_size{64};
 constexpr std::uint32_t k_compute_begin{0};
 constexpr std::uint32_t k_compute_end{1};
@@ -251,7 +250,7 @@ void Sample::CreateFrameResources() {
 }
 
 void Sample::CreateComputePipeline() {
-  const auto shader_path = std::filesystem::path{PROJECT_SHADER_DIR} / k_shader_directory / "lod.comp.spv";
+  const auto shader_path = std::filesystem::path{PROJECT_SHADER_DIR} / "lod.comp.spv";
   auto shader = fw::ShaderModule::Load(*m_device, shader_path);
   const auto set_layout = m_compute_set_layout.GetHandle();
   fw::ComputePipelineDesc desc{};
@@ -261,7 +260,7 @@ void Sample::CreateComputePipeline() {
 }
 
 void Sample::CreateGraphicsPipeline(VkFormat color_format) {
-  const auto shader_directory = std::filesystem::path{PROJECT_SHADER_DIR} / k_shader_directory;
+  const auto shader_directory = std::filesystem::path{PROJECT_SHADER_DIR};
   auto vertex = fw::ShaderModule::Load(*m_device, shader_directory / "lod.vert.spv");
   auto fragment = fw::ShaderModule::Load(*m_device, shader_directory / "lod.frag.spv");
   const std::array<VkVertexInputBindingDescription, 2> bindings{{

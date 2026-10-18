@@ -304,8 +304,8 @@ void Sample::CreateComputeResources() {
     vkUpdateDescriptorSets(m_device->GetHandle(), static_cast<std::uint32_t>(writes.size()), writes.data(), 0, nullptr);
   }
 
-  auto shader = fw::ShaderModule::Load(
-    *m_device, std::filesystem::path{PROJECT_SHADER_DIR} / "gpu_driven_rendering/synchronization_commands_comp.spv");
+  auto shader =
+    fw::ShaderModule::Load(*m_device, std::filesystem::path{PROJECT_SHADER_DIR} / "synchronization_commands_comp.spv");
   const auto set_layout = m_compute_set_layout.GetHandle();
   const VkPushConstantRange simulation_range{
     .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
@@ -317,8 +317,8 @@ void Sample::CreateComputeResources() {
   desc.layout.set_layouts = std::span{&set_layout, 1};
   desc.layout.push_constants = std::span{&simulation_range, 1};
   m_compute_pipeline = fw::Pipeline::CreateCompute(*m_device, desc);
-  auto state_shader = fw::ShaderModule::Load(
-    *m_device, std::filesystem::path{PROJECT_SHADER_DIR} / "gpu_driven_rendering/synchronization_state_comp.spv");
+  auto state_shader =
+    fw::ShaderModule::Load(*m_device, std::filesystem::path{PROJECT_SHADER_DIR} / "synchronization_state_comp.spv");
   desc.shader = state_shader.GetHandle();
   m_state_pipeline = fw::Pipeline::CreateCompute(*m_device, desc);
 }
@@ -487,8 +487,8 @@ void Sample::CreateDepthImages(VkExtent2D extent) {
 
 void Sample::CreatePipeline(VkFormat color_format) {
   const auto shader_directory = std::filesystem::path{PROJECT_SHADER_DIR};
-  auto vertex = fw::ShaderModule::Load(*m_device, shader_directory / "gpu_driven_rendering/synchronization_vert.spv");
-  auto fragment = fw::ShaderModule::Load(*m_device, shader_directory / "gpu_driven_rendering/synchronization_frag.spv");
+  auto vertex = fw::ShaderModule::Load(*m_device, shader_directory / "synchronization_vert.spv");
+  auto fragment = fw::ShaderModule::Load(*m_device, shader_directory / "synchronization_frag.spv");
   const VkVertexInputBindingDescription binding{
     .binding = 0,
     .stride = sizeof(fw::Vertex),

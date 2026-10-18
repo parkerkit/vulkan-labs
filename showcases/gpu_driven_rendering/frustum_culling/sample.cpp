@@ -306,8 +306,8 @@ void Sample::CreateComputeResources() {
     vkUpdateDescriptorSets(m_device->GetHandle(), static_cast<std::uint32_t>(writes.size()), writes.data(), 0, nullptr);
   }
 
-  auto shader = fw::ShaderModule::Load(
-    *m_device, std::filesystem::path{PROJECT_SHADER_DIR} / "gpu_driven_rendering/frustum_culling_comp.spv");
+  auto shader =
+    fw::ShaderModule::Load(*m_device, std::filesystem::path{PROJECT_SHADER_DIR} / "frustum_culling_comp.spv");
   const auto set_layout = m_compute_set_layout.GetHandle();
   fw::ComputePipelineDesc desc{};
   desc.shader = shader.GetHandle();
@@ -476,8 +476,8 @@ void Sample::CreateDepthImages(VkExtent2D extent) {
 
 void Sample::CreatePipeline(VkFormat color_format) {
   const auto shader_directory = std::filesystem::path{PROJECT_SHADER_DIR};
-  auto vertex = fw::ShaderModule::Load(*m_device, shader_directory / "gpu_driven_rendering/frustum_culling_vert.spv");
-  auto fragment = fw::ShaderModule::Load(*m_device, shader_directory / "gpu_driven_rendering/frustum_culling_frag.spv");
+  auto vertex = fw::ShaderModule::Load(*m_device, shader_directory / "frustum_culling_vert.spv");
+  auto fragment = fw::ShaderModule::Load(*m_device, shader_directory / "frustum_culling_frag.spv");
   const VkVertexInputBindingDescription binding{
     .binding = 0,
     .stride = sizeof(fw::Vertex),
@@ -522,8 +522,8 @@ void Sample::OnResize(const fw::SwapchainInfo& swapchain) {
 
 void Sample::CreateDebugPipeline(VkFormat color_format) {
   const auto shader_directory = std::filesystem::path{PROJECT_SHADER_DIR};
-  auto vertex = fw::ShaderModule::Load(*m_device, shader_directory / "gpu_driven_rendering/frustum_debug_vert.spv");
-  auto fragment = fw::ShaderModule::Load(*m_device, shader_directory / "gpu_driven_rendering/frustum_debug_frag.spv");
+  auto vertex = fw::ShaderModule::Load(*m_device, shader_directory / "frustum_debug_vert.spv");
+  auto fragment = fw::ShaderModule::Load(*m_device, shader_directory / "frustum_debug_frag.spv");
   const std::array layouts{m_set_layout.GetHandle(), m_compute_set_layout.GetHandle()};
   const VkPushConstantRange mode_range{
     .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,

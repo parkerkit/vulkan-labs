@@ -23,5 +23,5 @@ add_dependencies("${target_name}" "${shader_target_name}")
 target_compile_definitions("${target_name}" PRIVATE
     "BINDLESS_TEXTURE_COUNT=${texture_count}"
     "PROJECT_ASSETS_DIR=\"${PROJECT_ASSETS_DIR}/\""
-    "PROJECT_SHADER_DIR=\"${PROJECT_SHADER_DIR}/\""
+    "PROJECT_SHADER_DIR=\"${shader_output_dir}\""
 )

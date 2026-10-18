@@ -58,7 +58,6 @@ static_assert(sizeof(CullingUniform) == 112, "CullingUniform must match the GLSL
 static_assert(offsetof(CullingUniform, options) == 96, "CullingUniform options must match GLSL");
 
 static_assert(sizeof(VkDrawIndexedIndirectCommand) == 20, "Indirect command must match the GLSL std430 struct");
-constexpr auto k_shader_directory = "gpu_driven_rendering/prefix_sum_compaction";
 // 与本示例的 Compute shader 工作组大小保持一致。
 constexpr std::uint32_t k_compute_group_size{64};
 constexpr std::uint32_t GroupCount(std::uint32_t object_count) {
@@ -315,7 +314,7 @@ void Sample::CreateComputeResources() {
     vkUpdateDescriptorSets(m_device->GetHandle(), static_cast<std::uint32_t>(writes.size()), writes.data(), 0, nullptr);
   }
 
-  const auto shader_directory = std::filesystem::path{PROJECT_SHADER_DIR} / k_shader_directory;
+  const auto shader_directory = std::filesystem::path{PROJECT_SHADER_DIR};
   const auto set_layout = m_compute_set_layout.GetHandle();
   const auto create_pipeline = [&](const std::filesystem::path& path) {
     auto shader = fw::ShaderModule::Load(*m_device, path);
@@ -523,7 +522,7 @@ void Sample::CreateDepthImages(VkExtent2D extent) {
 }
 
 void Sample::CreatePipeline(VkFormat color_format) {
-  const auto shader_directory = std::filesystem::path{PROJECT_SHADER_DIR} / k_shader_directory;
+  const auto shader_directory = std::filesystem::path{PROJECT_SHADER_DIR};
   auto vertex = fw::ShaderModule::Load(*m_device, shader_directory / "scene.vert.spv");
   auto fragment = fw::ShaderModule::Load(*m_device, shader_directory / "scene.frag.spv");
   const VkVertexInputBindingDescription binding{
@@ -569,7 +568,7 @@ void Sample::OnResize(const fw::SwapchainInfo& swapchain) {
 }
 
 void Sample::CreateDebugPipeline(VkFormat color_format) {
-  const auto shader_directory = std::filesystem::path{PROJECT_SHADER_DIR} / k_shader_directory;
+  const auto shader_directory = std::filesystem::path{PROJECT_SHADER_DIR};
   auto vertex = fw::ShaderModule::Load(*m_device, shader_directory / "frustum_debug.vert.spv");
   auto fragment = fw::ShaderModule::Load(*m_device, shader_directory / "frustum_debug.frag.spv");
   const std::array layouts{m_set_layout.GetHandle(), m_compute_set_layout.GetHandle()};

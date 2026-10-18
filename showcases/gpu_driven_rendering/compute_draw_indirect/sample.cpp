@@ -255,8 +255,8 @@ void Sample::CreateComputeResources() {
     vkUpdateDescriptorSets(m_device->GetHandle(), static_cast<std::uint32_t>(writes.size()), writes.data(), 0, nullptr);
   }
 
-  auto shader = fw::ShaderModule::Load(
-    *m_device, std::filesystem::path{PROJECT_SHADER_DIR} / "gpu_driven_rendering/compute_draw_indirect_comp.spv");
+  auto shader =
+    fw::ShaderModule::Load(*m_device, std::filesystem::path{PROJECT_SHADER_DIR} / "compute_draw_indirect_comp.spv");
   const auto set_layout = m_compute_set_layout.GetHandle();
   fw::ComputePipelineDesc desc{};
   desc.shader = shader.GetHandle();
@@ -385,10 +385,8 @@ void Sample::CreateDepthImages(VkExtent2D extent) {
 
 void Sample::CreatePipeline(VkFormat color_format) {
   const auto shader_directory = std::filesystem::path{PROJECT_SHADER_DIR};
-  auto vertex =
-    fw::ShaderModule::Load(*m_device, shader_directory / "gpu_driven_rendering/compute_draw_indirect_vert.spv");
-  auto fragment =
-    fw::ShaderModule::Load(*m_device, shader_directory / "gpu_driven_rendering/compute_draw_indirect_frag.spv");
+  auto vertex = fw::ShaderModule::Load(*m_device, shader_directory / "compute_draw_indirect_vert.spv");
+  auto fragment = fw::ShaderModule::Load(*m_device, shader_directory / "compute_draw_indirect_frag.spv");
   const VkVertexInputBindingDescription binding{
     .binding = 0,
     .stride = sizeof(fw::Vertex),

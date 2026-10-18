@@ -16,7 +16,6 @@
 
 namespace demo {
 namespace {
-constexpr auto k_shader_directory = "gpu_driven_rendering/bindless_material";
 constexpr std::array<const char*, BINDLESS_TEXTURE_COUNT> k_texture_files{
   "alpha_blend.png",
   "brick_wall.jpg",
@@ -136,7 +135,7 @@ void Sample::CreateDescriptors() {
 }
 
 void Sample::CreatePipeline(VkFormat color_format) {
-  const auto shader_directory = std::filesystem::path{PROJECT_SHADER_DIR} / k_shader_directory;
+  const auto shader_directory = std::filesystem::path{PROJECT_SHADER_DIR};
   auto vertex = fw::ShaderModule::Load(*m_device, shader_directory / "material.vert.spv");
   auto fragment = fw::ShaderModule::Load(*m_device, shader_directory / "material.frag.spv");
   const VkVertexInputBindingDescription binding{0, sizeof(fw::Vertex), VK_VERTEX_INPUT_RATE_VERTEX};

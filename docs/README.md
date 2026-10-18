@@ -16,7 +16,7 @@
 
 | 文档 | 内容 |
 | --- | --- |
-| [Vulkan 基础](vulkan-fundamentals.md) | 对象生命周期、坐标空间、描述符、内存、命令与同步 |
+| [Vulkan 基础](vulkan-fundamentals.md) | 对象生命周期、图形管线顺序、坐标与深度、资源绑定和同步 |
 | [专题实现](rendering-techniques.md) | 结合源码说明资源绑定、多阶段渲染、计算与 API 使用方式 |
 | [工程组织](project-layout.md) | 目录职责、CMake 模块、依赖边界与 Shader 构建 |
 | [开发指南](development.md) | 修改入口、静态检查、提交工具与文档素材 |

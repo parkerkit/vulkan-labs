@@ -1,7 +1,7 @@
 set(target_name gpu_lod)
 set(shader_target_name "${target_name}_shaders")
 set(shader_dir "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
-set(shader_output_dir "${PROJECT_SHADER_DIR}/gpu_driven_rendering/gpu_lod")
+set(shader_output_dir "${PROJECT_SHADER_DIR}/gpu_driven_rendering/lod")
 
 add_executable("${target_name}" main.cpp sample.h sample.cpp)
 target_link_libraries("${target_name}" PRIVATE Framework::Framework)
@@ -19,4 +19,4 @@ add_custom_target("${shader_target_name}" DEPENDS
 )
 project_setup_ide("${shader_target_name}" FOLDER "Showcases/Shaders")
 add_dependencies("${target_name}" "${shader_target_name}")
-target_compile_definitions("${target_name}" PRIVATE "PROJECT_SHADER_DIR=\"${PROJECT_SHADER_DIR}/\"")
+target_compile_definitions("${target_name}" PRIVATE "PROJECT_SHADER_DIR=\"${shader_output_dir}\"")
