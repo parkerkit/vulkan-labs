@@ -1,0 +1,32 @@
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+// 32 字节，与 C++ 的 ObjectState 以及图形着色器中的结构体一致。
+struct ObjectState {
+    vec4 offset_and_visible;
+    vec4 color;
+};
+
+layout(set = 0, binding = 2, std430) writeonly buffer ObjectStates {
+    ObjectState states[];
+};
+
+layout(push_constant) uniform SimulationParameters {
+    float time;
+    float displacement;
+    float visible_fraction;
+    uint draw_count;
+} simulation;
+
+void main() {
+    uint object_index = gl_GlobalInvocationID.x;
+    if (object_index >= simulation.draw_count) {
+        return;
+    }
+
+    float phase = simulation.time + float(object_index) * 0.173;
+    float visible = float(object_index) < float(simulation.draw_count) * simulation.visible_fraction ? 1.0 : 0.0;
+    states[object_index].offset_and_visible = vec4(0.0, sin(phase) * simulation.displacement, 0.0, visible);
+    states[object_index].color = vec4(0.55 + 0.45 * sin(vec3(phase) + vec3(0.0, 2.0943951, 4.1887902)), 1.0);
+}
