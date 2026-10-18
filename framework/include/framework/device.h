@@ -22,6 +22,7 @@ struct DeviceDesc {
 #endif
   };
   bool enable_sampler_anisotropy{false};
+  bool enable_multi_draw_indirect{false};
   std::vector<std::string> required_extensions{};  ///< 必需设备扩展；框架自动加入交换链扩展。
 };
 
@@ -32,6 +33,7 @@ struct DeviceInfo {
   uint32_t present_family{};
   bool is_validation_enabled{false};
   bool is_sampler_anisotropy_enabled{false};
+  bool is_multi_draw_indirect_enabled{false};
 };
 
 /// @brief 管理实例、窗口表面、设备及分配器，所有子资源必须先于 Device 销毁。

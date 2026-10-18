@@ -215,6 +215,7 @@ void Device::SelectPhysicalDevice(const DeviceDesc& desc) {
     if (properties.apiVersion < VK_API_VERSION_1_3 || features13.dynamicRendering != VK_TRUE ||
         features13.synchronization2 != VK_TRUE ||
         (desc.enable_sampler_anisotropy && features.features.samplerAnisotropy != VK_TRUE) ||
+        (desc.enable_multi_draw_indirect && features.features.multiDrawIndirect != VK_TRUE) ||
         !HasExtensions(candidate, desc)) {
       continue;
     }
@@ -291,6 +292,7 @@ void Device::CreateLogicalDevice(const DeviceDesc& desc) {
     .features = {},
   };
   features.features.samplerAnisotropy = desc.enable_sampler_anisotropy ? VK_TRUE : VK_FALSE;
+  features.features.multiDrawIndirect = desc.enable_multi_draw_indirect ? VK_TRUE : VK_FALSE;
   // 支持的特性不会自动启用，只向逻辑设备申请框架和调用者实际需要的特性。
   const auto extensions = GetDeviceExtensions(desc);
   VkDeviceCreateInfo info{
@@ -309,6 +311,7 @@ void Device::CreateLogicalDevice(const DeviceDesc& desc) {
   vkGetDeviceQueue(m_device, m_info.graphics_family, 0, &m_graphics_queue);
   vkGetDeviceQueue(m_device, m_info.present_family, 0, &m_present_queue);
   m_info.is_sampler_anisotropy_enabled = desc.enable_sampler_anisotropy;
+  m_info.is_multi_draw_indirect_enabled = desc.enable_multi_draw_indirect;
 }
 
 Device::~Device() noexcept {
